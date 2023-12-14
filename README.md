@@ -17,7 +17,7 @@ Annotations :
     - turn_at_start (bool) : Début d'un IPU
     - turn_after (bool) : Changement de locuteur principal
     - yield at end (bool) : Fin d'un IPU 
-    - request at start(bool) : Début d'un IPU + lorsqu'une volonté de prendre la parole a été interpétée 
+    - request at start(bool) : Début d'un IPU lorsqu'une volonté de prendre la parole a été interpétée 
     - turn_start_word(float) : Pas utile, à supprimer
 
 
