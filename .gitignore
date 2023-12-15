@@ -3,4 +3,4 @@ project_env/
 __pycache__/
 txt_data.csv
 test.ipynb
-labels.xlsx
+data.csv

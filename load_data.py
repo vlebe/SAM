@@ -14,10 +14,8 @@ def load_all_ipus(folder_path:str='data/transcr', load_words:bool=False):
         data.append(df)
             
     data = pd.concat(data, axis=0).reset_index(drop=True)
-    print(data.shape)
     plabels = [col for col in data.columns if not any([col.startswith(c) 
             for c in ['dyad', 'ipu_id','speaker','start','stop','text', 'duration']])]
-    print(data[plabels].sum(axis=0) / data.shape[0])
     return data
 
 def filter_after_jokes(df_ipu:pd.DataFrame):
@@ -32,4 +30,13 @@ if __name__ == "__main__" :
     data, _ = filter_after_jokes(data)
 
     # Ce fichier contient les labels ainsi que les transcriptions (données texte)
-    data.to_excel("labels.xlsx")
+
+    # Preprocessing
+    data['text'].fillna('non', inplace=True)
+    data = data[(data["dyad"] != "transcr\AAOR") & (data["dyad"] != "transcr\JLLJ") & (data["dyad"] != "transcr\JRBG")]
+    plabels = [col for col in data.columns if not any([col.startswith(c) 
+            for c in ['dyad', 'ipu_id','speaker','start','stop','text', 'duration']])]
+    print(data.shape)
+    print(data[plabels].sum(axis=0) / data.shape[0])
+
+    data.to_csv("data.csv", index=False)
