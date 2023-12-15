@@ -75,14 +75,14 @@ def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
 
     for i in range(df.shape[0]):
         line = df.iloc[i]
-        print(line[line.index[0]])
         start_time = line.start
         stop_time = line.stop
         start_frame = int(start_time * fps)
         stop_frame = int(stop_time * fps)
         if stop_frame - start_frame >= 4 :
             start_temp = stop_frame - nb_frame
-        name_ipu = f'IPU_{str(line[line.index[0]]) + ".mp4"}'
+        # name_ipu = f'IPU_{str(line[line.index[0]]) + ".mp4"}'
+        name_ipu = f'IPU_{str(line.id)+ ".mp4"}'  
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_temp)
         try:
             os.makedirs(output_video_path + name_ipu)

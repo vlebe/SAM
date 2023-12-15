@@ -34,6 +34,7 @@ if __name__ == "__main__" :
     # Preprocessing
     data['text'].fillna('non', inplace=True)
     data = data[(data["dyad"] != "transcr\AAOR") & (data["dyad"] != "transcr\JLLJ") & (data["dyad"] != "transcr\JRBG")]
+    data['id'] = [i for i in range(data.shape[0])]
     plabels = [col for col in data.columns if not any([col.startswith(c) 
             for c in ['dyad', 'ipu_id','speaker','start','stop','text', 'duration']])]
     print(data.shape)
