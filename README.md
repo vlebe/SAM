@@ -20,7 +20,14 @@ Annotations :
     - request at start(bool) : Début d'un IPU lorsqu'une volonté de prendre la parole a été interpétée 
     - turn_start_word(float) : Pas utile, à supprimer
 
+Choix : 
+- Les bandes son suivantes ont été supprimées car nous n'avons pas les vidéos correspondantes : JLLJ et JRBG
+- Pour AAOR nous n'avons que la bande son pour AA ou le mix des deux, nous avons choisi de l'ignorer pour le moment
 
 Lien utiles :
 
 - Définitions et illustrations IPUs : https://www.researchgate.net/figure/Illustration-of-turn-taking-events-IPU-Interpausal-Unit-Turn-for-speaker-A-and_fig1_359613784
+
+### Fichiers python
+- `load_data.py` : Créé le fichier data.csv (shape : (13861, 12)) qui traite les différents fichiers dans le dossier *transcr* du dataset et applique nos choix
+- `split_data.py` : Génère tous les exemples d'apprentissagesà partir du fichier data.csv des audios et des vidéos. Chaque fichier audio/vidéo et découpé par IPU. 
