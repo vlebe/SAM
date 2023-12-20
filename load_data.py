@@ -39,11 +39,14 @@ if __name__ == "__main__" :
 
     # Preprocessing
     data['text'].fillna('non', inplace=True)
-    data = data[(data["dyad"] != "AAOR") & (data["dyad"] != "JLLJ") & (data["dyad"] != "JRBG")].reset_index()
+    data = data[(data["dyad"] != "AAOR") & (data["dyad"] != "JLLJ") & (data["dyad"] != "JRBG")]
+
+    # Remove data with audio length < 0.15s 
+    data = data[data["stop"]-data["start"] > 0.15].reset_index(drop=True)
     plabels = [col for col in data.columns if not any([col.startswith(c) 
             for c in ['dyad', 'ipu_id','speaker','start','stop','text', 'duration']])]
     print(data[plabels].sum(axis=0) / data.shape[0])
-    data.drop(["ipu_id", "index"], inplace=True, axis=1)
+    data.drop(["ipu_id"], inplace=True, axis=1)
     data["id"] = data.index
     print(data.shape)
 

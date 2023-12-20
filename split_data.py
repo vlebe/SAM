@@ -80,6 +80,9 @@ def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
         stop_frame = int(stop_time * fps)
         if stop_frame - start_frame >= 4 :
             start_temp = stop_frame - nb_frame
+        else :
+            start_temp = start_frame
+            
         name_ipu = f'IPU_{line.id}'  
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_temp)
         try:
@@ -101,6 +104,7 @@ def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
 
         except FileExistsError:
             print("Folder of frames already exists !")
+            break
 
     # Release the VideoCapture and VideoWriter objects
     cap.release()
