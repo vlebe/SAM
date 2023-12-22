@@ -4,3 +4,5 @@ __pycache__/
 txt_data.csv
 data.csv
 labels.csv
+architecture.txt
+architecture_our_model.txt
