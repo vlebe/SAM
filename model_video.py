@@ -6,19 +6,7 @@ import torch.optim as optim
 from dataset import Dataset
 from tqdm import tqdm
 import os
-
-num_cores = os.cpu_count()
-resolution = (70, 126, 3)
-batch_size = 32
-num_epochs = 10
-learning_rate = 0.001
-num_classes = 1
-output_embedding_model_shape = (32, 1280, 3, 4)
-hidden_size = 512
-num_layers = 1
-input_size = output_embedding_model_shape[1] * output_embedding_model_shape[2] * output_embedding_model_shape[3]
-learning_rate_fine_tuned_layers = 0.0001  
-learning_rate_default = 0.001  
+import argparse
 
 class VideoEmbedding(nn.Module):
     def __init__(self, pretrained_model, layers_fine_tuned = None):
@@ -85,7 +73,7 @@ class VideoModelLateFusion(nn.Module):
         x = self.fc(x[:, -1, :])  # Take the last output from the GRU sequence
         return x
 
-def train(embedding_model, model, train_loader, optimizer, criterion):
+def train(embedding_model, model, train_loader, optimizer, criterion, output_embedding_model_shape):
     print("Training...")
     model.train()
     running_loss = 0.0
@@ -106,7 +94,7 @@ def train(embedding_model, model, train_loader, optimizer, criterion):
         running_loss += loss.item()
     return running_loss / len(train_loader)
 
-def test(embedding_model, model, test_loader, criterion):
+def test(embedding_model, model, test_loader, criterion, output_embedding_model_shape):
     print("Testing...")
     model.eval()
     running_loss = 0.0
@@ -133,6 +121,24 @@ def test(embedding_model, model, test_loader, criterion):
 
 if __name__ == '__main__':
 
+    num_cores = os.cpu_count()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
+    parser.add_argument('--num_epochs', type=int, default=10, help='number of epochs to train for')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate')
+    parser.add_argument('--learning_rate_fine_tuned_layers', type=float, default=0.0001, help='learning rate for fine-tuned layers')
+    parser.add_argument('--learning_rate_default', type=float, default=0.001, help='learning rate for other layers')
+    parser.add_argument('--hidden_size', type=int, default=512, help='hidden size')
+    parser.add_argument('--num_layers', type=int, default=1, help='number of layers')
+    parser.add_argument('--output_embedding_model_shape', type=tuple, default=(32, 1280, 3, 4), help='output shape of the embedding model')
+    parser.add_argument('--num_classes', type=int, default=1, help='number of classes')
+    parser.add_argument('--resolution', type=tuple, default=(70, 126, 3), help='resolution of the input images')
+    parser.add_argument('--nb_layers_fine_tuned', type=int, default=0, help='number of fine tuned layers of the pretrained model')
+    parser.add_argument('--num_workers', type=int, default=6, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
+    args = parser.parse_args()
+    batch_size = args.batch_size
+    input_size = args.output_embedding_model_shape[1] * args.output_embedding_model_shape[2] * args.output_embedding_model_shape[3]
+
     if torch.cuda.is_available():
         device = torch.device('cuda')
     elif torch.backends.mps.is_available():
@@ -144,7 +150,7 @@ if __name__ == '__main__':
     pretrained_model = torch.hub.load('pytorch/vision:v0.10.0', 'mobilenet_v2', pretrained=True)
     pretrained_model.to(device)
     total_nb_pt_layers = len(pretrained_model.features)
-    nb_pt_layers_to_fine_tune = total_nb_pt_layers - 3
+    nb_pt_layers_to_fine_tune = total_nb_pt_layers - args.nb_layers_fine_tuned
     if nb_pt_layers_to_fine_tune == total_nb_pt_layers:
         layers_fine_tuned = None
         layers_fine_tuned_name = None
@@ -160,25 +166,25 @@ if __name__ == '__main__':
 
 
     embedding_model = VideoEmbedding(pretrained_model, layers_fine_tuned)
-    model = VideoModelLateFusion(input_size, hidden_size, num_layers, num_classes)
+    model = VideoModelLateFusion(input_size, args.hidden_size, args.num_layers, args.num_classes)
     embedding_model.to(device)
-    model.to('mps')
+    model.to(device)
 
     params = []
     for name, param in model.named_parameters():
         if param.requires_grad:
             if layers_fine_tuned is None:
-                params.append({'params': param, 'lr': learning_rate_default})
+                params.append({'params': param, 'lr': args.learning_rate_default})
             else:
                 if name is not None and name in layers_fine_tuned_name:
-                    params.append({'params': param, 'lr': learning_rate_fine_tuned_layers})
+                    params.append({'params': param, 'lr': args.learning_rate_fine_tuned_layers})
                 else:
-                    params.append({'params': param, 'lr': learning_rate_default})
+                    params.append({'params': param, 'lr': args.learning_rate_default})
     optimizer = optim.Adam(params=params)
     criterion = nn.BCEWithLogitsLoss()
     criterion.to(device)
 
-    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution)
+    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', args.resolution)
     indice1 = torch.randperm(1116)
     indice2 = torch.randperm(len(dataset)- 1984) + 1984
     indice = torch.cat((indice1,indice2))
@@ -187,17 +193,15 @@ if __name__ == '__main__':
     train_dataset = torch.utils.data.Subset(dataset, train_index)
     test_dataset = torch.utils.data.Subset(dataset, test_index)
     if device == torch.device('cuda') or device == torch.device('mps'):
-        num_workers = input(f"Enter the number of workers: (P.S. you have {num_cores} cores available)")
-        num_workers = int(num_workers)
-        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=6, pin_memory=True)
-        test_loader = torch.utils.data.DataLoader(test_dataset, shuffle=True, num_workers=6, pin_memory=True)
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+        test_loader = torch.utils.data.DataLoader(test_dataset, shuffle=True, num_workers=args.num_workers, pin_memory=True)
     else:
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         test_loader = torch.utils.data.DataLoader(test_dataset, shuffle=True)
 
     print("Start training...")
-    for epoch in range(num_epochs):
-        train_loss = train(embedding_model, model, train_loader, optimizer, criterion)
+    for epoch in range(args.num_epochs):
+        train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
         print(f"Epoch {epoch+1} : train loss {train_loss}")
 
 
@@ -208,7 +212,7 @@ if __name__ == '__main__':
     # model.load_state_dict(torch.load('model.pt'))
     # embedding_model = VideoEmbedding(pretrained_model, layers_fine_tuned)
     # embedding_model.load_state_dict(torch.load('embedding_model.pt'))
-    test_loss = test(embedding_model, model, test_loader, criterion)
+    test_loss = test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)
     print(f"Test loss {test_loss}")
 
 
