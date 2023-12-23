@@ -7,6 +7,7 @@ import cv2
 import torch
 
 resolution = (70, 126, 3)
+number_of_frames = 4
 
 class Dataset(Dataset):
     def __init__(self, labels_file_path, frame_dir, audio_dir, txt_data_file_path, img_shape):
@@ -28,20 +29,21 @@ class Dataset(Dataset):
 
         speaker = self.labels["speaker"][index]
         record = self.labels["dyad"][index]
-        audio_path = self.audio_dir + f"{record}/{record}_{speaker}_{index}.wav"
-        fs, audio = wavfile.read(audio_path)
+        # audio_path = self.audio_dir + f"{record}/{record}_{speaker}_{index}.wav"
+        # fs, audio = wavfile.read(audio_path)
 
         frame_dir = self.frame_dir + f"IPU_{index}/"
         img_list_path = os.listdir(frame_dir)
 
-        frame_sequence = np.zeros((len(img_list_path), self.img_shape[0], self.img_shape[1], self.img_shape[2]))
+        frame_sequence = np.zeros((4, self.img_shape[0], self.img_shape[1], self.img_shape[2]))
         for i, image_path in enumerate(img_list_path):
             img = cv2.imread(frame_dir + image_path)
             frame_sequence[i] = cv2.resize(img, (self.img_shape[1], self.img_shape[0]))
 
-        audio, frame_sequence = torch.tensor(audio), torch.tensor(frame_sequence)
-
-        return (int(label), txt, (fs, audio), frame_sequence)
+        # audio, frame_sequence = torch.tensor(audio), torch.tensor(frame_sequence)
+        frame_sequence = torch.tensor(frame_sequence, dtype=torch.float32)
+        # return (int(label), txt, (fs, audio), frame_sequence)
+        return (int(label), txt, frame_sequence)
     
 if __name__ == "__main__" :
     dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution)

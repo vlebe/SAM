@@ -6,3 +6,6 @@ data.csv
 labels.csv
 architecture.txt
 architecture_our_model.txt
+test.py
+model.pt
+embedding_model.pt

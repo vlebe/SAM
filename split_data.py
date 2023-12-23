@@ -132,14 +132,14 @@ def main(args):
     
     data = pd.read_csv(args.file_path)
 
-    save_txt_data(data)
-    print("Txt data saved")
+    # save_txt_data(data)
+    # print("Txt data saved")
 
-    save_labels(data)
-    print("Labels saved")
+    # save_labels(data)
+    # print("Labels saved")
 
-    split_and_save_audio_ipu(data, args.audio_dir, args.audio_sample_dir)
-    print("Audio splitted and saved")
+    # split_and_save_audio_ipu(data, args.audio_dir, args.audio_sample_dir)
+    # print("Audio splitted and saved")
 
     split_and_save_video_ipu(data,args.video_dir, args.frame_dir,args.nb_frame)
     print("Video splitted and saved")
