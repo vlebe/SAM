@@ -12,9 +12,9 @@ class AudioLSTMModel(nn.Module):
         
     def forward(self, x):
         _, x = self.lstm(x)
-        x = x[0].permute(1, 0, 2)
-        x = self.flatten(x)
-        x = self.sigmoid(self.linear(x)).view(-1)
+        # x = x[0].permute(1, 0, 2)
+        # x = self.flatten(x)
+        # x = self.sigmoid(self.linear(x)).view(-1)
         return x
     
 class AudioMLPModel(nn.Module):
@@ -36,6 +36,6 @@ class AudioMLPModel(nn.Module):
     
 if __name__ == '__main__':
     model = AudioLSTMModel()
-    x = torch.randn(2, 100, 13)
+    x = torch.randn(2, 100, 20)
     h_out = model(x)
-    print(h_out.shape)
+    print(h_out[0].shape)

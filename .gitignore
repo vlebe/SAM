@@ -4,3 +4,4 @@ __pycache__/
 txt_data.csv
 data.csv
 labels.csv
+test.ipynb
