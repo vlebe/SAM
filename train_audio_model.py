@@ -1,6 +1,6 @@
-from audio_dataset import AudioDataset, custom_collate, train_test_split
-from audio_model import AudioLSTMModel, AudioMLPModel
-
+from audio_dataset import custom_collate, train_test_split #, AudioDataset
+from audio_model import AudioLSTMModel, AudioMLPModel, AudioEndToEndModel
+from vggish_dataset import AudioDataset
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader
@@ -35,13 +35,14 @@ def evaluate(model, dataloader, criterion, metric, device):
     return total_loss / len(dataloader), score / len(dataloader)
 
 if __name__ == "__main__":
-    dataset = AudioDataset('data/audio/samples/', 'labels.csv', mlp=True)
+    dataset = AudioDataset('data/audio/samples/', 'labels.csv')
     train_dataset, val_dataset, test_dataset = train_test_split(dataset)
     train_dataloader, val_dataloader, test_dataloader = DataLoader(train_dataset, batch_size=64, shuffle=True, collate_fn=custom_collate), DataLoader(val_dataset, batch_size=64, shuffle=True, collate_fn=custom_collate), DataLoader(test_dataset, batch_size=64, shuffle=True, collate_fn=custom_collate)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # model = AudioLSTMModel().to(device)
-    model = AudioMLPModel().to(device)
+    # model = AudioMLPModel().to(device)
+    model = AudioEndToEndModel().to(device)
 
     criterion = torch.nn.BCELoss()
 

@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+from vggish_model import VGGish
 
 class AudioLSTMModel(nn.Module):
     def __init__(self):
@@ -21,6 +22,7 @@ class AudioMLPModel(nn.Module):
     def __init__(self):
         super(AudioMLPModel, self).__init__()
 
+        self.relu = nn.ReLU()
         self.linear1 = nn.Linear(3960, 1024)
         self.linear2 = nn.Linear(1024, 512)
         self.linear3 = nn.Linear(512, 256)
@@ -29,17 +31,34 @@ class AudioMLPModel(nn.Module):
         self.sigmoid = nn.Sigmoid()
         
     def forward(self, x):
-        x = self.linear1(x)
-        x = self.linear2(x)
-        x = self.linear3(x)
-        x = self.linear4(x)
+        x = self.relu(self.linear1(x))
+        x = self.relu(self.linear2(x))
+        x = self.relu(self.linear3(x))
+        x = self.relu(self.linear4(x))
         x = self.linear5(x)
         x = self.sigmoid(x).view(-1)
         return x
     
+class AudioEndToEndModel(nn.Module) :
+    def __init__(self) :
+        super().__init__()
+
+        self.embedding = VGGish()
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+        self.l1 = nn.Linear(128, 64)
+        self.l2 = nn.Linear(64, 1)
+
+    def forward(self, x) :
+        x = self.relu(self.embedding(x))
+        x = self.relu(self.l1(x))
+        x = self.sigmoid(self.l2(x))
+
+        return x.view(-1)
+
 if __name__ == '__main__':
-    model = AudioMLPModel()
-    x = torch.randn(2, 3960)
-    h_out = model(x)
-    print(h_out.shape)
-    print(h_out)
+    model = AudioEndToEndModel()
+    x = torch.randn(2, 1, 96, 64)
+    output = model(x)
+    print(output.shape)
+    print(output)
