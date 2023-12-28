@@ -8,8 +8,13 @@ from torchaudio.transforms import MFCC
 def custom_collate(batch):
     labels, mfcc_list = zip(*batch)
     # Pad each sequence individually and store them in a list
-    print(mfcc_list[0].shape)
     padded_mfcc_list = pad_sequence([mfcc for mfcc in mfcc_list], batch_first=True, padding_value=0)
+
+    if len(padded_mfcc_list.shape) == 2 :
+        desired_length = 3960
+        padding_needed = max(0, desired_length - padded_mfcc_list.size(1))
+
+        padded_mfcc_list = torch.nn.functional.pad(padded_mfcc_list, (0, padding_needed), value=0)
 
     return torch.tensor(labels), padded_mfcc_list
 
@@ -48,15 +53,17 @@ class AudioDataset(Dataset):
             n_mfcc=20,
             melkwargs={"n_fft": 400, "hop_length": 160, "n_mels": 23, "center": False},
         )
-        mfcc = transform(audio).squeeze(0)
+        mfcc = transform(audio).squeeze(0).T
 
-        return int(label), mfcc.T
+        if self.mlp :
+            mfcc = torch.nn.Flatten()(mfcc.unsqueeze(0))
+
+        return int(label), mfcc.squeeze(0)
 
 if __name__ == "__main__":
     dataset = AudioDataset('data/audio/samples/', 'labels.csv', mlp=True)
     label, mfcc = dataset.__getitem__(9)
     dataloader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=custom_collate)
     for labels, mfcc in dataloader:
-        print(mfcc.shape)
+        print(mfcc.shape)    
         break
-        

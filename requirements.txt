@@ -1,0 +1,7 @@
+torch
+torchaudio
+pandas
+scipy 
+matplotlib
+tqdm 
+opencv-python

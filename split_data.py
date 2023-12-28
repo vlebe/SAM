@@ -142,8 +142,8 @@ def main(args):
     split_and_save_audio_ipu(data, args.audio_dir, args.audio_sample_dir)
     print("Audio splitted and saved")
 
-    split_and_save_video_ipu(data,args.video_dir, args.frame_dir,args.nb_frame)
-    print("Video splitted and saved")
+    # split_and_save_video_ipu(data,args.video_dir, args.frame_dir,args.nb_frame)
+    # print("Video splitted and saved")
 
 
 if __name__ == "__main__" :
