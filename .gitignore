@@ -10,3 +10,4 @@ test.py
 model.pt
 embedding_model.pt
 Reports.txt
+architecture_our_embedding_model.txt
