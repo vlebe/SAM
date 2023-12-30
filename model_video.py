@@ -97,10 +97,11 @@ def train(embedding_model, model, train_loader, optimizer, criterion, output_emb
     embedding_model.train()
     model.train()
     running_loss = 0.0
+
     for i, (labels, _, frames) in tqdm(enumerate(train_loader)):
-        labels = 1.0 - 2*labels.view(-1, 1).float()
         sequence = torch.zeros((output_embedding_model_shape[0],4, output_embedding_model_shape[1] * output_embedding_model_shape[2] * output_embedding_model_shape[3]))
         if torch.backends.mps.is_available():
+            labels = labels.type(torch.LongTensor)
             labels = labels.to('mps')
             frames = frames.to('mps')
             sequence = sequence.to('mps')
@@ -114,7 +115,7 @@ def train(embedding_model, model, train_loader, optimizer, criterion, output_emb
         running_loss += loss.item()
     return running_loss / len(train_loader)
 
-def test(embedding_model, model, test_loader, criterion, output_embedding_model_shape, threshold=0.7):
+def test(embedding_model, model, test_loader, criterion, output_embedding_model_shape):
     global device
     print("Testing...")
     embedding_model.eval()
@@ -128,11 +129,10 @@ def test(embedding_model, model, test_loader, criterion, output_embedding_model_
             sequence = torch.zeros((1, 4, output_embedding_model_shape[1] * output_embedding_model_shape[2] * output_embedding_model_shape[3]), dtype=torch.float32)
             
             if torch.backends.mps.is_available():
+                labels = labels.type(torch.LongTensor)
                 labels = labels.to('mps')
                 frames = frames.to('mps')
                 sequence = sequence.to('mps')
-            
-            labels = 1.0 - 2 * labels.view(-1, 1).float()
 
             for j in range(frames.shape[1]):
                 sequence[:, j, :] = embedding_model(frames[:, j, :, :, :])
@@ -142,19 +142,11 @@ def test(embedding_model, model, test_loader, criterion, output_embedding_model_
             running_loss += loss.item()
 
             # Concatenate predictions and labels for later metric calculation
-            total_predictions = torch.cat((total_predictions, outputs.view(-1)))
-            total_labels = torch.cat((total_labels, labels.view(-1)))
-
-            # Calculate precision, recall, and accuracy for the current batch
-            binary_predictions = torch.argmax(torch.sigmoid(outputs), dim=1)
-            tp = torch.sum((binary_predictions == 1) & (labels == 1)).item()
-            fp = torch.sum((binary_predictions == 1) & (labels == 0)).item()
-            tn = torch.sum((binary_predictions == 0) & (labels == 0)).item()
-            fn = torch.sum((binary_predictions == 0) & (labels == 1)).item()
-
+            total_predictions = torch.cat((total_predictions, outputs), dim=0)
+            total_labels = torch.cat((total_labels, labels), dim=0)
 
     average_loss = running_loss / len(test_loader)
-    thresholded_predictions = torch.where(torch.sigmoid(total_predictions) > threshold, torch.tensor(1.0, device=device), torch.tensor(0.0, device=device))
+    thresholded_predictions = torch.argmax(total_predictions, dim=1)
     # Calculate overall precision, recall, and accuracy
     overall_tp = torch.sum((thresholded_predictions == 1) & (total_labels == 1)).item()
     overall_fp = torch.sum((thresholded_predictions == 1) & (total_labels == 0)).item()
@@ -187,7 +179,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_layers', type=int, default=1, help='number of layers')
     parser.add_argument('--max_iter', type=int, default=10, help='maximum number of iteration, witout any improvement on the train loss with tol equal to 1e-3')
     parser.add_argument('--output_embedding_model_shape', type=tuple, default=(32, 2048, 1, 1), help='output shape of the embedding model')
-    parser.add_argument('--num_classes', type=int, default=1, help='number of classes')
+    parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--resolution', type=tuple, default=(3, 224, 224), help='resolution of the input images')
     parser.add_argument('--num_workers', type=int, default=6, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
     args = parser.parse_args()
@@ -213,8 +205,7 @@ if __name__ == '__main__':
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-    criterion = nn.BCEWithLogitsLoss()
-    criterion.to(device)
+    criterion = nn.CrossEntropyLoss().to(device)
 
     dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', args.resolution, preprocess)
     indice1 = torch.randperm(1116)
@@ -237,28 +228,30 @@ if __name__ == '__main__':
     #     plt.show()
     #     break
 
-    print("Start training...")
-    old_train_loss = 0
-    iteration = 0
-    for epoch in range(args.num_epochs):
-        train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
-        if old_train_loss - train_loss < 1e-3:
-            iteration += 1
-        else:
-            iteration = 0
-        if iteration == args.max_iter or old_train_loss - train_loss < 0.0 :
-            print(f"Early stopping at epoch {epoch+1} : train loss {train_loss}")
-            break
-        print(f"Epoch {epoch+1} : train loss {train_loss}")
+    # print("Start training...")
+    # old_train_loss = 0
+    # iteration = 0
+    # for epoch in range(args.num_epochs):
+    #     train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
+    #     if abs(old_train_loss - train_loss) < 1e-3:
+    #         iteration += 1
+    #     else:
+    #         iteration = 0
+    #     if epoch!=0 and (iteration == args.max_iter or old_train_loss - train_loss < 0.0) :
+    #         print(f"Early stopping at epoch {epoch+1} : train loss {train_loss}")
+    #         break
+    #     else:
+    #         print(f"Epoch {epoch+1} : train loss {train_loss}")
+    #         old_train_loss = train_loss
 
 
-    torch.save(embedding_model.state_dict(), 'data/parameter_models/embedding_modelV3.pt')
-    torch.save(model.state_dict(), 'data/parameter_models/modelV3.pt')
+    # torch.save(embedding_model.state_dict(), 'data/parameter_models/embedding_modelV3.pt')
+    # torch.save(model.state_dict(), 'data/parameter_models/modelV3.pt')
 
-    # model = VideoModelLateFusion(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
-    # model.load_state_dict(torch.load('data/parameter_models/modelV3.pt'))
-    # embedding_model = VideoEmbedding(pretrained_model, layers_fine_tuned).to(device)
-    # embedding_model.load_state_dict(torch.load('data/parameter_models/embedding_modelV3.pt'))
+    model = VideoModelLateFusion(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
+    model.load_state_dict(torch.load('data/parameter_models/modelV3.pt'))
+    embedding_model = VideoEmbedding(pretrained_model).to(device)
+    embedding_model.load_state_dict(torch.load('data/parameter_models/embedding_modelV3.pt'))
         
 
     test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)
