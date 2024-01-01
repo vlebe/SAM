@@ -129,7 +129,7 @@ def train(embedding_model, model, train_loader, optimizer, criterion, output_emb
     embedding_model.to(device)
     running_loss = 0.0
 
-    for i, (labels, _, frames) in tqdm(enumerate(train_loader)):
+    for i, (labels, _, _, frames) in tqdm(enumerate(train_loader)):
         sequence = torch.zeros((output_embedding_model_shape[0],4, output_embedding_model_shape[1] * output_embedding_model_shape[2] * output_embedding_model_shape[3]))
         if torch.backends.mps.is_available():
             labels = labels.type(torch.LongTensor)
@@ -153,7 +153,7 @@ def validation(embedding_model, model, validation_loader, criterion, output_embe
     embedding_model.to('cpu')
     model.to('cpu')
     running_loss = 0.0
-    for i, (labels, _, frames) in tqdm(enumerate(validation_loader)):
+    for i, (labels, _, _, frames) in tqdm(enumerate(validation_loader)):
         sequence = torch.zeros((1, 4, output_embedding_model_shape[1] * output_embedding_model_shape[2] * output_embedding_model_shape[3]), dtype=torch.float32)
         labels = labels.type(torch.LongTensor)
         labels = labels.to('cpu')
@@ -180,7 +180,7 @@ def test(embedding_model, model, test_loader, criterion, output_embedding_model_
     total_labels = torch.tensor([], dtype=torch.float32, device = device)
 
     with torch.no_grad():
-        for i, (labels, _, frames) in tqdm(enumerate(test_loader)):
+        for i, (labels, _, _, frames) in tqdm(enumerate(test_loader)):
             sequence = torch.zeros((1, 4, output_embedding_model_shape[1] * output_embedding_model_shape[2] * output_embedding_model_shape[3]), dtype=torch.float32)
 
             

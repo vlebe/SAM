@@ -47,4 +47,4 @@ if __name__ == "__main__" :
     data["id"] = data.index
     print(data.shape)
 
-    data.to_csv("data.csv", index=False)
+    data.to_csv("data/data.csv", index=False)

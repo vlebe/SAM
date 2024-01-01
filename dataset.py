@@ -47,8 +47,8 @@ class Dataset(Dataset):
 
         speaker = self.labels["speaker"][index]
         record = self.labels["dyad"][index]
-        # audio_path = self.audio_dir + f"{record}/{record}_{speaker}_{index}.wav"
-        # fs, audio = wavfile.read(audio_path)
+        audio_path = self.audio_dir + f"{record}/{record}_{speaker}_{index}.wav"
+        fs, audio = wavfile.read(audio_path)
 
         frame_dir = self.frame_dir + f"IPU_{index}/"
         img_list_path = os.listdir(frame_dir)
@@ -60,11 +60,10 @@ class Dataset(Dataset):
             img = self.preprocess(img)
             frame_sequence[i] = img
 
-        # audio, frame_sequence = torch.tensor(audio), torch.tensor(frame_sequence)
+        audio, frame_sequence = torch.tensor(audio), torch.tensor(frame_sequence)
         frame_sequence = torch.tensor(frame_sequence, dtype=torch.float32)
-        # return (int(label), txt, (fs, audio), frame_sequence)
-        return (int(label), txt, frame_sequence)
+        return (int(label), txt, (fs, audio), frame_sequence)
     
 if __name__ == "__main__" :
-    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution)
+    dataset = Dataset('data/labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'data/txt_data.csv', resolution)
     print(dataset.__getitem__(0))
