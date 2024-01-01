@@ -46,7 +46,7 @@ def split_and_save_audio_ipu(data, audio_dir, audio_sample_dir) :
 def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
 
     # Create a VideoCapture object
-    cap = cv2.VideoCapture(input_video_path)
+    cap = cv2.VideoCapture(input_video_path, cv2.CAP_FFMPEG)
     speaker1, speaker2 = video_path.split('_')
     speaker2 = speaker2[:-4]
     try :
@@ -62,7 +62,6 @@ def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
 
     print(f'Extracting {speaker1} and {speaker2} ...')
     df = df[(df['dyad']== speaker1 + speaker2) | (df['dyad']==speaker2 + speaker1)]
-
 
     # Check if the video file is opened successfully
     if not cap.isOpened():
@@ -94,8 +93,7 @@ def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
                 ret, frame = cap.read()
 
                 if not ret:
-                    print("Error: Unable to read frame.")
-                    break
+                    raise("Error: Unable to read frame.")
 
                 # Write the frame to the output video
                 output_name = output_video_path + name_ipu + "/" + f'{num}.jpeg'
@@ -147,7 +145,7 @@ def main(args):
 
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser(description="Process and analyze data.")
-    parser.add_argument("-f", "--file_path", type=str, default="data.csv", help="Path to the data CSV file")
+    parser.add_argument("-f", "--file_path", type=str, default="data/data.csv", help="Path to the data CSV file")
     parser.add_argument("--audio_dir", type=str, default="data/audio/1_channels_wav/", help="Directory for audio files")
     parser.add_argument("--audio_sample_dir", type=str, default="data/audio/samples/", help="Directory for audio samples")
     parser.add_argument("--video_dir", type=str, default="data/video/", help="Directory for video files")
