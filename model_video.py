@@ -55,18 +55,15 @@ class VideoEmbedding(nn.Module):
         return x
 
 
-class VideoModelLateFusion(nn.Module):
+class VideoModelLateFusion1(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
-        super(VideoModelLateFusion,self).__init__()
+        super(VideoModelLateFusion1,self).__init__()
         self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=True)
         self.fc1 = nn.Linear(hidden_size, hidden_size//2)
         self.batchnorm1 = nn.BatchNorm1d(hidden_size//2)
-        # self.fc2 = nn.Linear(hidden_size//2, hidden_size//4)
-        # self.batchnorm2 = nn.BatchNorm1d(hidden_size//4)
         self.fo = nn.Linear(hidden_size//2, num_classes)
         self.relu = nn.ReLU()
         self.dropout1 = nn.Dropout(p=0.3)
-        # self.dropout2 = nn.Dropout(p=0.5)
     
     def get_architecture(self):
         learnable_layers = []
@@ -84,10 +81,42 @@ class VideoModelLateFusion(nn.Module):
         x = self.batchnorm1(x)
         x = self.relu(x)
         x = self.dropout1(x)
-        # x = self.fc2(x)
-        # x = self.batchnorm2(x)
-        # x = self.relu(x)
-        # x = self.dropout2(x)
+        x = self.fo(x)
+        return x
+    
+class VideoModelLateFusion2(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, num_classes):
+        super(VideoModelLateFusion2,self).__init__()
+        self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=True)
+        self.fc1 = nn.Linear(hidden_size, hidden_size//2)
+        self.batchnorm1 = nn.BatchNorm1d(hidden_size//2)
+        self.fc2 = nn.Linear(hidden_size//2, hidden_size//4)
+        self.batchnorm2 = nn.BatchNorm1d(hidden_size//4)
+        self.fo = nn.Linear(hidden_size//4, num_classes)
+        self.relu = nn.ReLU()
+        self.dropout1 = nn.Dropout(p=0.3)
+        self.dropout2 = nn.Dropout(p=0.5)
+    
+    def get_architecture(self):
+        learnable_layers = []
+        for name, param in self.named_parameters():
+            learnable_layers.append([name, param])
+        with open('architecture_our_model.txt', 'w') as f :
+            f.write('--------------------------LEARNABLE LAYERS--------------------------' + '\n')
+            for layer in learnable_layers:
+                f.write(str(layer[0]) + '\n')
+                f.write(str(layer[1]) + '\n')
+
+    def forward(self, x):
+        x, _ = self.gru(x)
+        x = self.fc1(x[:, -1, :])  # Take the last output from the GRU sequence
+        x = self.batchnorm1(x)
+        x = self.relu(x)
+        x = self.dropout1(x)
+        x = self.fc2(x)
+        x = self.batchnorm2(x)
+        x = self.relu(x)
+        x = self.dropout2(x)
         x = self.fo(x)
         return x
 
@@ -96,6 +125,8 @@ def train(embedding_model, model, train_loader, optimizer, criterion, output_emb
     print("Training...")
     embedding_model.train()
     model.train()
+    model.to(device)
+    embedding_model.to(device)
     running_loss = 0.0
 
     for i, (labels, _, frames) in tqdm(enumerate(train_loader)):
@@ -115,11 +146,35 @@ def train(embedding_model, model, train_loader, optimizer, criterion, output_emb
         running_loss += loss.item()
     return running_loss / len(train_loader)
 
+def validation(embedding_model, model, validation_loader, criterion, output_embedding_model_shape):
+    print("Validation...")
+    embedding_model.eval()
+    model.eval()
+    embedding_model.to('cpu')
+    model.to('cpu')
+    running_loss = 0.0
+    for i, (labels, _, frames) in tqdm(enumerate(validation_loader)):
+        sequence = torch.zeros((1, 4, output_embedding_model_shape[1] * output_embedding_model_shape[2] * output_embedding_model_shape[3]), dtype=torch.float32)
+        labels = labels.type(torch.LongTensor)
+        labels = labels.to('cpu')
+        frames = frames.to('cpu')
+        sequence = sequence.to('cpu')
+        for j in range(frames.shape[1]):
+            sequence[:, j, :] = embedding_model(frames[:, j, :, :, :])
+        outputs = model(sequence)
+        loss = criterion(outputs, labels)
+        running_loss += loss.item()
+    return running_loss / len(validation_loader)
+
+
+
 def test(embedding_model, model, test_loader, criterion, output_embedding_model_shape):
     global device
     print("Testing...")
     embedding_model.eval()
     model.eval()
+    embedding_model.to(device)
+    model.to(device)
     running_loss = 0.0
     total_predictions = torch.tensor([], dtype=torch.float32, device = device)
     total_labels = torch.tensor([], dtype=torch.float32, device = device)
@@ -127,6 +182,7 @@ def test(embedding_model, model, test_loader, criterion, output_embedding_model_
     with torch.no_grad():
         for i, (labels, _, frames) in tqdm(enumerate(test_loader)):
             sequence = torch.zeros((1, 4, output_embedding_model_shape[1] * output_embedding_model_shape[2] * output_embedding_model_shape[3]), dtype=torch.float32)
+
             
             if torch.backends.mps.is_available():
                 labels = labels.type(torch.LongTensor)
@@ -200,7 +256,8 @@ if __name__ == '__main__':
     preprocess = weights.transforms().to(device)
 
     embedding_model = VideoEmbedding(pretrained_model)
-    model = VideoModelLateFusion(input_size, args.hidden_size, args.num_layers, args.num_classes)
+    # model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes)
+    model = VideoModelLateFusion2(input_size, args.hidden_size, args.num_layers, args.num_classes)
     embedding_model.to(device)
     model.to(device)
 
@@ -212,14 +269,18 @@ if __name__ == '__main__':
     indice2 = torch.randperm(len(dataset)- 1984) + 1984
     indice = torch.cat((indice1,indice2))
     train_index = indice[:int(len(dataset)*0.8)//batch_size*batch_size]
-    test_index = indice[int(len(dataset)*0.8)//batch_size*batch_size:]
+    validation_index = indice[int(len(dataset)*0.8)//batch_size*batch_size:int(len(dataset)*0.9)//batch_size*batch_size]
+    test_index = indice[int(len(dataset)*0.9)//batch_size*batch_size:]
     train_dataset = torch.utils.data.Subset(dataset, train_index)
+    validation_dataset = torch.utils.data.Subset(dataset, validation_index)
     test_dataset = torch.utils.data.Subset(dataset, test_index)
     if device == torch.device('cuda') or device == torch.device('mps'):
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+        validation_loader = torch.utils.data.DataLoader(validation_dataset, shuffle=True)
         test_loader = torch.utils.data.DataLoader(test_dataset, shuffle=True, num_workers=args.num_workers, pin_memory=True)
     else:
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        validation_loader = torch.utils.data.DataLoader(validation_dataset, shuffle=True)
         test_loader = torch.utils.data.DataLoader(test_dataset, shuffle=True)
 
     # for batch in train_loader:
@@ -228,30 +289,35 @@ if __name__ == '__main__':
     #     plt.show()
     #     break
 
-    # print("Start training...")
-    # old_train_loss = 0
-    # iteration = 0
-    # for epoch in range(args.num_epochs):
-    #     train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
-    #     if abs(old_train_loss - train_loss) < 1e-3:
-    #         iteration += 1
-    #     else:
-    #         iteration = 0
-    #     if epoch!=0 and (iteration == args.max_iter or old_train_loss - train_loss < 0.0) :
-    #         print(f"Early stopping at epoch {epoch+1} : train loss {train_loss}")
-    #         break
-    #     else:
-    #         print(f"Epoch {epoch+1} : train loss {train_loss}")
-    #         old_train_loss = train_loss
+    print("Start training...")
+    valid_losses = []
+    non_valid_iteration = 0
+    max_iter = 5
+    for epoch in range(args.num_epochs):
+        # train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
+        train_loss = 0.0
+        valid_loss = validation(embedding_model, model, validation_loader, criterion, args.output_embedding_model_shape)
+        if epoch == 0:
+            valid_losses.append(valid_loss)
+        elif valid_loss < min(valid_losses):
+            valid_losses.append(valid_loss)
+            non_valid_iteration = 0
+        else:
+            non_valid_iteration += 1
+        if non_valid_iteration == max_iter:
+            print(f"Early stopping at epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
+            break
+        else:
+            print(f"Epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
 
 
-    # torch.save(embedding_model.state_dict(), 'data/parameter_models/embedding_modelV3.pt')
-    # torch.save(model.state_dict(), 'data/parameter_models/modelV3.pt')
+    torch.save(embedding_model.state_dict(), 'data/parameter_models/embedding_modelV4.pt')
+    torch.save(model.state_dict(), 'data/parameter_models/modelV4.pt')
 
-    model = VideoModelLateFusion(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
-    model.load_state_dict(torch.load('data/parameter_models/modelV3.pt'))
-    embedding_model = VideoEmbedding(pretrained_model).to(device)
-    embedding_model.load_state_dict(torch.load('data/parameter_models/embedding_modelV3.pt'))
+    # model = VideoModelLateFusion2(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
+    # model.load_state_dict(torch.load('data/parameter_models/modelV4.pt'))
+    # embedding_model = VideoEmbedding(pretrained_model).to(device)
+    # embedding_model.load_state_dict(torch.load('data/parameter_models/embedding_modelV4.pt'))
         
 
     test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)

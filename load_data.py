@@ -39,7 +39,7 @@ if __name__ == "__main__" :
 
     # Preprocessing
     data['text'].fillna('non', inplace=True)
-    data = data[(data["dyad"] != "AAOR") & (data["dyad"] != "JLLJ") & (data["dyad"] != "JRBG")].reset_index()
+    data = data[(data["dyad"] != "AAOR") & (data["dyad"] != "JLLJ") & (data["dyad"] != "JRBG") &(data["dyad"] != "MDAD")].reset_index()
     plabels = [col for col in data.columns if not any([col.startswith(c) 
             for c in ['dyad', 'ipu_id','speaker','start','stop','text', 'duration']])]
     print(data[plabels].sum(axis=0) / data.shape[0])
