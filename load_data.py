@@ -3,9 +3,9 @@ import os
 from glob import glob
 import platform
 
-def load_all_ipus(folder_path:str="data/transcr", load_words:bool=False):
+def load_all_ipus(folder_path:str="/Users/meliya/Desktop/SAM/Projet/transcr", load_words:bool=False):
     """Load all csv and concatenate
-    """
+    """ 
     file_list = glob(os.path.join(folder_path, f"*_merge{'_words' if load_words else ''}.csv"))
     # Load all csv files
     data = []
@@ -32,7 +32,7 @@ def filter_after_jokes(df_ipu:pd.DataFrame):
     return df_ipu[df_ipu.apply(lambda x: x.ipu_id > jokes_end.get(x.dyad,0), axis = 1)], jokes_end
 
 if __name__ == "__main__" :
-    data = load_all_ipus('data/transcr')
+    data = load_all_ipus('/Users/meliya/Desktop/SAM/Projet/transcr')
     data, _ = filter_after_jokes(data)
 
     # Ce fichier contient les labels ainsi que les transcriptions (données texte)
