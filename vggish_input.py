@@ -96,6 +96,6 @@ def wavfile_to_examples(wav_file, return_tensor=True):
     return waveform_to_examples(samples, sr, return_tensor)
 
 if __name__ == "__main__" :
-    log_mel = wavfile_to_examples("data/audio/samples/ACMZ/ACMZ_AC_12382.wav")
+    log_mel = wavfile_to_examples("data/audio/samples/ACMZ/ACMZ_AC_14.wav")
     print(log_mel.shape)
     print(log_mel)

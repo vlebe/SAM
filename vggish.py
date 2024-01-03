@@ -11,16 +11,19 @@ class VGG(nn.Module):
         super(VGG, self).__init__()
         self.features = features
         self.embeddings = nn.Sequential(
-            nn.Linear(512 * 4 * 6, 4096),
+            nn.Linear(512 * 4, 4096),
             nn.ReLU(True),
+            nn.Dropout(0.5),  # Add dropout
+            nn.BatchNorm1d(4096),
             nn.Linear(4096, 4096),
             nn.ReLU(True),
+            nn.Dropout(0.5),  # Add dropout
+            nn.BatchNorm1d(4096),
             nn.Linear(4096, 128),
             nn.ReLU(True))
 
     def forward(self, x):
         x = self.features(x)
-
         # Transpose the output from features to
         # remain compatible with vggish embeddings
         x = torch.transpose(x, 1, 3)
@@ -56,8 +59,8 @@ class Postprocessor(nn.Module):
             (vggish_params.EMBEDDING_SIZE, 1), dtype=torch.float
         )
 
-        self.pca_eigen_vectors = nn.Parameter(self.pca_eigen_vectors, requires_grad=False)
-        self.pca_means = nn.Parameter(self.pca_means, requires_grad=False)
+        self.pca_eigen_vectors = nn.Parameter(self.pca_eigen_vectors, requires_grad=True)
+        self.pca_means = nn.Parameter(self.pca_means, requires_grad=True)
 
     def postprocess(self, embeddings_batch):
         """Applies tensor postprocessing to a batch of embeddings.
@@ -141,54 +144,32 @@ def _vgg():
 
 
 class VGGish(VGG):
-    def __init__(self, urls, device=None, pretrained=True, preprocess=True, postprocess=True, progress=True):
+    def __init__(self, device=None, postprocess=True, progress=True):
         super().__init__(make_layers())
-        if pretrained:
-            state_dict = hub.load_state_dict_from_url(urls['vggish'], progress=progress)
-            super().load_state_dict(state_dict)
 
         if device is None:
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device = device
-        self.preprocess = preprocess
-        self.postprocess = postprocess
-        if self.postprocess:
-            self.pproc = Postprocessor()
-            if pretrained:
-                state_dict = hub.load_state_dict_from_url(urls['pca'], progress=progress)
-                # TODO: Convert the state_dict to torch
-                state_dict[vggish_params.PCA_EIGEN_VECTORS_NAME] = torch.as_tensor(
-                    state_dict[vggish_params.PCA_EIGEN_VECTORS_NAME], dtype=torch.float
-                )
-                state_dict[vggish_params.PCA_MEANS_NAME] = torch.as_tensor(
-                    state_dict[vggish_params.PCA_MEANS_NAME].reshape(-1, 1), dtype=torch.float
-                )
-
-                self.pproc.load_state_dict(state_dict)
+        # self.postprocess = postprocess
+        # if self.postprocess:
+        #     self.pproc = Postprocessor()
+        self.dropout = nn.Dropout(0.5)
+        self.bn = nn.BatchNorm1d(128)
+        self.linear = nn.Linear(128, 1)
+        self.sigmoid = nn.Sigmoid()
         self.to(self.device)
 
-    def forward(self, x, fs=None):
-        if self.preprocess:
-            x = self._preprocess(x, fs)
+    def forward(self, x):
         x = x.to(self.device)
         x = VGG.forward(self, x)
-        if self.postprocess:
-            x = self._postprocess(x)
+        # if self.postprocess:
+        #     x = self._postprocess(x)
+        if len(x.shape) >= 2:
+            x = torch.sum(x, dim=0)
+        x = self.dropout(x)
+        x = self.linear(x.squeeze(0))
+        x = self.sigmoid(x)
         return x
 
-    def _preprocess(self, x, fs):
-        if isinstance(x, np.ndarray):
-            x = vggish_input.waveform_to_examples(x, fs)
-        elif isinstance(x, str):
-            x = vggish_input.wavfile_to_examples(x)
-        else:
-            raise AttributeError
-        return x
-
-    def _postprocess(self, x):
-        return self.pproc(x)
-    
-if __name__ == "__main__" :
-    vgg = VGGish([], pretrained=False, postprocess=False)
-    input = torch.randn(8, 1, 10, 64)
-    print(vgg(input))
+    # def _postprocess(self, x):
+    #     return self.pproc(x)

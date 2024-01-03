@@ -19,7 +19,7 @@ See vggish_slim.py for more information.
 """
 
 # Architectural constants.
-NUM_FRAMES = 96  # Frames in input mel-spectrogram patch.
+NUM_FRAMES = 25  # Frames in input mel-spectrogram patch.
 NUM_BANDS = 64  # Frequency bands in input mel-spectrogram patch.
 EMBEDDING_SIZE = 128  # Size of embedding layer.
 
@@ -31,7 +31,7 @@ NUM_MEL_BINS = NUM_BANDS
 MEL_MIN_HZ = 125
 MEL_MAX_HZ = 7500
 LOG_OFFSET = 0.01  # Offset used for stabilized log of input mel-spectrogram.
-EXAMPLE_WINDOW_SECONDS = 0.1  # Each example contains 1 10ms frames
+EXAMPLE_WINDOW_SECONDS = 0.25  # Each example contains 25 10ms frames
 EXAMPLE_HOP_SECONDS = 0.1  # with zero overlap.
 
 # Parameters used for embedding postprocessing.

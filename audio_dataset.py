@@ -45,6 +45,8 @@ class AudioDataset(Dataset):
         audio_path = self.audio_dir + f"{record}/{record}_{speaker}_{index}.wav"
         audio, sampling_rate = torchaudio.load(audio_path, normalize=True)
 
+        print(sampling_rate)
+
         if audio.shape[0] == 2:
             audio = torch.mean(audio, dim=0, keepdim=True)
 
