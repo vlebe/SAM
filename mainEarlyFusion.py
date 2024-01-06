@@ -29,14 +29,15 @@ class EarlyFusionModel(nn.Module):
         self.fh = nn.Linear(hidden_size_gru, hidden_size_gru//4)
         self.fo = nn.Linear(hidden_size_gru//4, num_classes)
         self.relu = nn.ReLU()
-        self.batchnorm1 = nn.BatchNorm1d(512)
+        self.batchnorm1 = nn.BatchNorm1d(hidden_size_gru//4)
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, x_video, x_audio, x_text):
         x_video, _ = self.gru(x_video)
+        x_video = x_video[:, -1, :]
         x_audio = self.fci_audio(x_audio)
         x_text = self.fci_text(x_text)
-        x = x_video * self.weight_video + x_audio * self.weight_audio + x_text * self.weight_text
+        x = x_video * self.weight_video.T + x_audio * self.weight_audio.T + x_text * self.weight_text.T
         x = self.fh(x)
         x = self.batchnorm1(x)
         x = self.relu(x)
@@ -53,16 +54,17 @@ def train(embedding_model_video,embedding_model_text, model, train_loader, optim
     embedding_model_text.train()
     embedding_model_video.train()
     running_loss = 0.0
-    for batch in train_loader:
+    for batch in tqdm(train_loader):
         labels, txt, mfcc, frames = batch
         frames = frames.to(device)
+        mfcc = mfcc.to(device)
         sequences = torch.zeros((len(labels),4, output_embedding_model_shape[0] * output_embedding_model_shape[1] * output_embedding_model_shape[2])).to(device)
         tokenizer_output = tokenizer(txt, return_tensors="pt", padding=True, truncation=True, max_length=512)
         input_ids, attention_mask = tokenizer_output["input_ids"].to(device), tokenizer_output["attention_mask"].to(device)
         with torch.no_grad():
             for j in range(frames.shape[1]):
                 sequences[:,j, :] = embedding_model_video(frames[:, j, :, :, :])
-            txt = embedding_model_text(input_ids, attention_mask)
+            txt = embedding_model_text(input_ids, attention_mask).to(device)
             labels = labels.type(torch.LongTensor).to(device)
         optimizer.zero_grad()
         outputs = model(sequences, mfcc, txt)
@@ -84,13 +86,14 @@ def evaluate(embedding_model_video,embedding_model_text, model, dataloader, crit
         for batch in tqdm(dataloader):
             labels, txt, mfcc, frames = batch
             frames = frames.to(device)
+            mfcc = mfcc.to(device)
             sequences = torch.zeros((len(labels),4, output_embedding_model_shape[0] * output_embedding_model_shape[1] * output_embedding_model_shape[2])).to(device)
             tokenizer_output = tokenizer(txt, return_tensors="pt", padding=True, truncation=True, max_length=512)
             input_ids, attention_mask = tokenizer_output["input_ids"].to(device), tokenizer_output["attention_mask"].to(device)
             with torch.no_grad():
                 for j in range(frames.shape[1]):
                     sequences[:,j, :] = embedding_model_video(frames[:, j, :, :, :])
-                txt = embedding_model_text(input_ids, attention_mask)
+                txt = embedding_model_text(input_ids, attention_mask).to(device)
                 labels = labels.type(torch.LongTensor).to(device)
             outputs = model(sequences, mfcc, txt)
             loss = criterion(outputs, labels)
@@ -117,14 +120,17 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', type=int, default=1, help='number of epochs to train for')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate')
     parser.add_argument('--learning_rate_default', type=float, default=0.0001, help='learning rate for other layers')
-    parser.add_argument('--hidden_size', type=int, default=512, help='hidden size')
-    parser.add_argument('--num_layers', type=int, default=1, help='number of layers')
+    parser.add_argument('--hidden_size_gru', type=int, default=512, help='hidden size')
+    parser.add_argument('--num_layers_gru', type=int, default=1, help='number of layers')
     parser.add_argument('--max_iter', type=int, default=10, help='maximum number of iteration, witout any improvement on the train loss with tol equal to 1e-3')
     parser.add_argument('--output_embedding_model_shape', type=tuple, default=(2048, 1, 1), help='output shape of the embedding model')
     parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--resolution', type=tuple, default=(3, 224, 224), help='resolution of the input images')
-    parser.add_argument('--num_workers', type=int, default=10, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
+    parser.add_argument('--num_workers', type=int, default=6, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
+    parser.add_argument('--input_size_audio', type=int, default=3960, help='input size of the audio model')
+    parser.add_argument('--input_size_text', type=int, default=768, help='input size of the audio model')
     args = parser.parse_args()
+    input_size_video = args.output_embedding_model_shape[0] * args.output_embedding_model_shape[1] * args.output_embedding_model_shape[2]
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -133,7 +139,7 @@ if __name__ == '__main__':
     else:
         device = torch.device('cpu')
 
-    model = EarlyFusionModel().to(device)
+    model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
     embedding_model_video = VideoEmbedding().to(device)
     embedding_model_text = DistilCamembertEmbedding().to(device)
     tokenizer = AutoTokenizer.from_pretrained("cmarkea/distilcamembert-base", use_fast=False)
@@ -161,38 +167,42 @@ if __name__ == '__main__':
     non_valid_iteration = 0
     max_iter = 5
     models_parameters = []
-    for epoch in range(args.num_epochs):
-        train_loss = train(embedding_model_video,embedding_model_text, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
-        valid_loss, valid_scores = evaluate(embedding_model_video,embedding_model_text, model, validation_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
-        if epoch == 0:
-            valid_losses.append(valid_loss)
-        elif valid_loss < min(valid_losses):
-            valid_losses.append(valid_loss)
-            non_valid_iteration = 0
-            models_parameters.append(model.state_dict())
-        else:
-            non_valid_iteration += 1
-        if non_valid_iteration == max_iter:
-            print(f"Early stopping at epoch {epoch+1}")
-            pocket_model = EarlyFusionModel().to(device)
-            pocket_model.load_state_dict(models_parameters[-1])
-            break
-        else:
-            print(f"Epoch {epoch} - Training Loss: {train_loss} - Validation Loss: {valid_loss} - Validation Scores (F1 score, accuracy_score, precision score, recall score): {valid_scores}")
-            valid_losses.append(valid_loss)
-            train_losses.append(train_loss)
-    plt.plot(train_losses, label="Training Loss")
-    plt.plot(valid_losses, label="Validation Loss")
-    plt.legend()
-    plt.savefig("data/earlyFusionModelLoss.png")
+    # for epoch in range(args.num_epochs):
+    #     train_loss = 0.0
+    #     # train_loss = train(embedding_model_video,embedding_model_text, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
+    #     valid_loss, valid_scores = evaluate(embedding_model_video,embedding_model_text, model, validation_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
+    #     if epoch == 0:
+    #         valid_losses.append(valid_loss)
+    #     elif valid_loss < min(valid_losses):
+    #         valid_losses.append(valid_loss)
+    #         non_valid_iteration = 0
+    #         models_parameters.append(model.state_dict())
+    #     else:
+    #         non_valid_iteration += 1
+    #     if non_valid_iteration == max_iter:
+    #         print(f"Early stopping at epoch {epoch+1}")
+    #         pocket_model = EarlyFusionModel().to(device)
+    #         pocket_model.load_state_dict(models_parameters[-1])
+    #         break
+    #     else:
+    #         print(f"Epoch {epoch} - Training Loss: {train_loss} - Validation Loss: {valid_loss} - Validation Scores (F1 score, accuracy_score, precision score, recall score): {valid_scores}")
+    #         valid_losses.append(valid_loss)
+    #         train_losses.append(train_loss)
+    # plt.plot(train_losses, label="Training Loss")
+    # plt.plot(valid_losses, label="Validation Loss")
+    # plt.legend()
+    # plt.savefig("data/ModelEarlyFusion/Graphs/earlyFusionModelLossDebog.png")
 
-    torch.save(model.state_dict(), 'data/parameter_models/modelV200EarlyStopping.pt')
-    torch.save(pocket_model.state_dict(), 'data/parameter_models/modelV200EarlyStoppingPocketAlgo.pt')
-
+    # torch.save(model.state_dict(), 'data/ModelEarlyFusion/Models/modelVdebogEarlyStopping.pt')
+    # torch.save(pocket_model.state_dict(), 'data/ModelEarlyFusion/Models/modelVdebogEarlyStoppingPocketAlgo.pt')
+    model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
+    # pocket_model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
+    model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/modelVdebogEarlyStopping.pt'))
+    # pocket_model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/modelVdebogEarlyStoppingPocketAlgo.pt'))
     _, test_scores = evaluate(embedding_model_video,embedding_model_text, model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
-    _, pocket_test_scores = evaluate(embedding_model_video,embedding_model_text, pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
+    # _, pocket_test_scores = evaluate(embedding_model_video,embedding_model_text, pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
     print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
-    print(f"Pocket Test Scores (F1 score, accuracy_score, precision score, recall score): {pocket_test_scores}")
+    # print(f"Pocket Test Scores (F1 score, accuracy_score, precision score, recall score): {pocket_test_scores}")
 
 
 
