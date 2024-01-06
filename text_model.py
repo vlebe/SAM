@@ -1,5 +1,5 @@
 
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoModel
 import torch
 import torch.nn as nn
 from transformers import pipeline
@@ -11,15 +11,12 @@ class DistilCamembertEmbedding(nn.Module):
     def __init__(self):
         super(DistilCamembertEmbedding, self).__init__()
         self.embedding_model = AutoModel.from_pretrained("cmarkea/distilcamembert-base")
-        self.tokenizer = AutoTokenizer.from_pretrained("cmarkea/distilcamembert-base", use_fast=False)
 
-    def forward(self, x):
+    def forward(self, input_ids, attention_mask):
         self.embedding_model.eval()
-        tokenizer_output = self.tokenizer(x, return_tensors="pt", padding=True, truncation=True, max_length=512)
-        input_ids, attention_mask = tokenizer_output["input_ids"], tokenizer_output["attention_mask"]
         output = self.embedding_model(input_ids, attention_mask)
-        # return output.last_hidden_state[:, 0, :]
-        return output.pooler_output
+        return output.last_hidden_state[:, 0, :]
+        # return output.pooler_output
     
 class TextModel(nn.Module):
     def __init__(self, hidden_size, num_classes):

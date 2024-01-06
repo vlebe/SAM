@@ -1,25 +1,15 @@
 import torch
 import torch.nn as nn
+import torchvision
 
 
 
 class VideoEmbedding(nn.Module):
-    def __init__(self, pretrained_model, layers_fine_tuned = None):
+    def __init__(self):
         super(VideoEmbedding, self).__init__()
+        weights = torchvision.models.ResNet50_Weights.IMAGENET1K_V2
+        pretrained_model = torchvision.models.resnet50(weights=weights)
         self.pretrained_model = nn.Sequential(*list(pretrained_model.children())[:-1])
-        self.layers_fine_tuned = layers_fine_tuned
-        self.set_fine_tune_settings(layers_fine_tuned)
-
-    def set_fine_tune_settings(self, layers_fine_tuned):
-        if layers_fine_tuned is None:
-            for name, param in self.pretrained_model.named_parameters():
-                param.requires_grad = False
-        else:
-            for name, param in self.pretrained_model.named_parameters():
-                if name in layers_fine_tuned:
-                    param.requires_grad = True
-                else:
-                    param.requires_grad = False
     
     def get_architecture(self):
         frozen_layers = []
@@ -30,12 +20,8 @@ class VideoEmbedding(nn.Module):
             else:
                 learnable_layers.append([name, param])
         with open('architecture_our_embedding_model.txt', 'w') as f :
-            f.write('--------------------------FROZEN LAYERS--------------------------' + '\n')
+            f.write('--------------------------LAYERS--------------------------' + '\n')
             for layer in frozen_layers:
-                f.write(str(layer[0]) + '\n')
-                f.write(str(layer[1]) + '\n')
-            f.write('--------------------------LEARNABLE LAYERS--------------------------' + '\n')
-            for layer in learnable_layers:
                 f.write(str(layer[0]) + '\n')
                 f.write(str(layer[1]) + '\n')
 
@@ -110,3 +96,10 @@ class VideoModelLateFusion2(nn.Module):
         x = self.dropout2(x)
         x = self.fo(x)
         return x
+    
+
+if __name__ == "__main__":
+    embedding_model = VideoEmbedding()
+    exemplar = torch.randn(2, 3, 224, 224)
+    output = embedding_model(exemplar)
+    print(output.size())

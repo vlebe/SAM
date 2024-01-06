@@ -1,4 +1,4 @@
-from dataset import custom_collate, train_test_split, Dataset
+from dataset import custom_collate_AudioDataset, train_test_split, AudioDataset
 from audio_model import AudioMLPModel1, AudioMLPModel2, AudioMLPModel3
 import matplotlib.pyplot as plt
 import torch
@@ -7,12 +7,46 @@ from tqdm import tqdm
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 import numpy as np 
 
+class EnsembleModel1(torch.nn.Module):
+    def __init__(self, models):
+        super(EnsembleModel1, self).__init__()
+        self.models = models
+        self.num_classes = 2
+
+    def forward(self, x):
+        with torch.no_grad():
+            combined_tensor = torch.cat([model(x) for model in self.models], dim=0)
+            sum_tensor = torch.sum(combined_tensor, dim=0)
+            output = torch.argmax(sum_tensor)
+        return output
+
+
+
+class EnsembleModel2(torch.nn.Module):
+    def __init__(self, models):
+        super(EnsembleModel2, self).__init__()
+        self.models = models
+        self.num_classes = 2
+        self.weight = torch.nn.Parameter(torch.rand(1,self.num_classes))
+        self.bias = torch.nn.Parameter(torch.rand(1,self.num_classes))
+
+    def forward(self, x):
+        with torch.no_grad():
+            outputs = [model(x) for model in self.models]
+            outputs = torch.stack(outputs)
+            outputs = outputs * self.weight
+            outputs = torch.sum(outputs, dim=0)
+            outputs = outputs + self.bias
+        return outputs
+    
+
+
 def train(model, dataloader, criterion, optimizer):
     model.train()
     device = torch.device('mps')
     model.to(device)
     total_loss = 0
-    for labels, _, mfcc,_ in tqdm(dataloader):
+    for labels, mfcc in tqdm(dataloader):
         labels = labels.type(torch.LongTensor)
         labels, mfcc = labels.to(device), mfcc.to(device)
         optimizer.zero_grad()
@@ -30,21 +64,28 @@ def evaluate(model, dataloader, criterion, metrics):
     total_loss = 0
     scores = [0 for _ in range(len(metrics))]
     with torch.no_grad():
-        for labels, _, mfcc, _ in tqdm(dataloader):
+        for labels, mfcc in tqdm(dataloader):
             labels = labels.type(torch.LongTensor)
             labels, mfcc = labels.to(device), mfcc.to(device)
             outputs = model(mfcc)
             loss = criterion(outputs, labels)
             total_loss += loss.item()
             for i, metric in enumerate(metrics):
-                scores[i] += metric(labels.cpu(), outputs.cpu().argmax(dim=1))
+                if metric.__name__ == "accuracy_score":
+                    args = {'y_true': labels.cpu().numpy(), 
+                        'y_pred': torch.argmax(outputs, dim=1).cpu().numpy()}
+                else:
+                    args = {'y_true': labels.cpu().numpy(), 
+                            'y_pred': torch.argmax(outputs, dim=1).cpu().numpy(),
+                            'zero_division': 0.0}
+                scores[i] += metric(**args)
             scores = np.array(scores)
     return total_loss / len(dataloader), scores / len(dataloader)
 
 if __name__ == "__main__":
-    dataset = Dataset(labels_file_path="labels.csv", frame_dir="data/video/dataset_frame/", audio_dir="data/audio/samples/", txt_data_file_path="data.csv", img_shape=(3,256,256), mlp_audio=True)
+    dataset = AudioDataset('labels.csv', 'data/audio/samples/')
     train_dataset, val_dataset, test_dataset = train_test_split(dataset)
-    train_dataloader, val_dataloader, test_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate, num_workers=10, pin_memory=True), DataLoader(val_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate, num_workers=10, pin_memory=True), DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate, num_workers=10, pin_memory=True)
+    train_dataloader, val_dataloader, test_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=2, pin_memory=True), DataLoader(val_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=1, pin_memory=True), DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=1, pin_memory=True)
 
     model = AudioMLPModel1()
     # model = AudioMLPModel2()
@@ -91,16 +132,20 @@ if __name__ == "__main__":
             print(f"Epoch {epoch} - Training Loss: {train_loss} - Validation Loss: {val_loss} - Validation Scores (F1 score, accuracy_score, precision score, recall score): {val_scores}")
         training_loss.append(train_loss)
         validation_loss.append(val_loss)
+    pocket_model = AudioMLPModel1()
+    pocket_model.load_state_dict(models_parameters[-1])
     
-    print(len(models_parameters))
-    model.load_state_dict(models_parameters[-1])
+
     plt.plot(training_loss, label="Training Loss")
     plt.plot(validation_loss, label="Validation Loss")
     plt.legend()
     plt.savefig("data/audio_model_loss_test.png")
 
     _, test_score = evaluate(model, test_dataloader, criterion, metrics)
-    print(f"Test Score: {test_score}")
+    _, pocket_test_score = evaluate(pocket_model, test_dataloader, criterion, metrics)
+    print(f"Test Early Score: {test_score}")
+    print(f"Test Pocket Score: {pocket_test_score}")
 
     # Save the model
-    torch.save(model.state_dict(), "data/audio_model_test.pt")
+    torch.save(model.state_dict(), "data/audio_model_Early_test.pt")
+    torch.save(pocket_model.state_dict(), "data/audio_model_Early_pocket_test.pt")
