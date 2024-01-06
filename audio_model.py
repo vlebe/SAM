@@ -29,13 +29,13 @@ class AudioLSTMModel(nn.Module):
         return x
     
 class AudioMLPModel1(nn.Module):
-    def __init__(self):
+    def __init__(self, input_size=3960,num_classes=2):
         super(AudioMLPModel1, self).__init__()
-        self.linear1 = nn.Linear(3960, 3960//16)
-        self.linear2 = nn.Linear(3960//16, 3960//64)
-        self.fco = nn.Linear(3960//64, 2)
-        self.batchnorm1 = nn.BatchNorm1d(3960//16)
-        self.batchnorm2 = nn.BatchNorm1d(3960//64)
+        self.linear1 = nn.Linear(input_size, input_size//16)
+        self.linear2 = nn.Linear(input_size//16, input_size//64)
+        self.fco = nn.Linear(input_size//64, num_classes)
+        self.batchnorm1 = nn.BatchNorm1d(input_size//16)
+        self.batchnorm2 = nn.BatchNorm1d(input_size//64)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.5)
 

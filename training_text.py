@@ -106,37 +106,38 @@ if __name__ == "__main__":
     val_losses = []
     max_iter = 20
     iter_non_valid = 0
-    for epoch in range(epochs):
-        if early_stopping:
-            print("Early stopping")
-            break
-        if not(early_stopping):
-            train_loss = train(embedding_model, model, train_loader, criterion, optimizer, device)
-            train_losses.append(train_loss)
-            val_loss, val_scores = evaluate(embedding_model, model, validation_loader, criterion, metrics, device)
-            val_losses.append(val_loss)
-            if epoch == 0:
-                min_val_loss = val_loss
-            elif val_loss < min_val_loss:
-                min_val_loss = val_loss
-                iter_non_valid = 0
-                models_parameters.append(model.state_dict())
-            else:
-                iter_non_valid += 1
-                if iter_non_valid == max_iter:
-                    early_stopping = True
-        print("Epoch {} : Train Loss = {}, Val Loss = {}, Val Scores = {}".format(epoch, train_loss, val_loss, val_scores))
+    # for epoch in range(epochs):
+    #     if early_stopping:
+    #         print("Early stopping")
+    #         break
+    #     if not(early_stopping):
+    #         train_loss = train(embedding_model, model, train_loader, criterion, optimizer, device)
+    #         train_losses.append(train_loss)
+    #         val_loss, val_scores = evaluate(embedding_model, model, validation_loader, criterion, metrics, device)
+    #         val_losses.append(val_loss)
+    #         if epoch == 0:
+    #             min_val_loss = val_loss
+    #         elif val_loss < min_val_loss:
+    #             min_val_loss = val_loss
+    #             iter_non_valid = 0
+    #             models_parameters.append(model.state_dict())
+    #         else:
+    #             iter_non_valid += 1
+    #             if iter_non_valid == max_iter:
+    #                 early_stopping = True
+    #     print("Epoch {} : Train Loss = {}, Val Loss = {}, Val Scores = {}".format(epoch, train_loss, val_loss, val_scores))
 
-    plt.plot(train_losses, label="Training Loss")
-    plt.plot(val_losses, label="Validation Loss")
-    plt.legend()
-    plt.savefig("data/text_model_loss.png")
-    torch.save(model.state_dict(), "text_model_Early.pt")
-    torch.save(models_parameters[-1], "text_model_Early_Pocket_Algo.pt")
-    pocket_model = TextModel(768, 2).to(device)
-    pocket_model.load_state_dict(models_parameters[-1])
+    # plt.plot(train_losses, label="Training Loss")
+    # plt.plot(val_losses, label="Validation Loss")
+    # plt.legend()
+    # plt.savefig("data/text_model_loss.png")
+    # torch.save(model.state_dict(), "text_model_Early.pt")
+    # torch.save(models_parameters[-1], "text_model_Early_Pocket_Algo.pt")
+    # pocket_model = TextModel(768, 2).to(device)
+    # pocket_model.load_state_dict(models_parameters[-1])
+    model.load_state_dict(torch.load("model_text.pt"))
     test_loss, test_scores = evaluate(embedding_model, model, test_loader, criterion, metrics, device)
-    pocket_test_loss, pocket_test_scores = evaluate(embedding_model, pocket_model, test_loader, criterion, metrics, device)
+    # pocket_test_loss, pocket_test_scores = evaluate(embedding_model, pocket_model, test_loader, criterion, metrics, device)
     print("Test Loss = {}, Test Scores = {}".format(test_loss, test_scores))
-    print("Pocket Test Loss = {}, Pocket Test Scores = {}".format(pocket_test_loss, pocket_test_scores))
+    # print("Pocket Test Loss = {}, Pocket Test Scores = {}".format(pocket_test_loss, pocket_test_scores))
 
