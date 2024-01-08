@@ -1,5 +1,5 @@
 from dataset import custom_collate_AudioDataset, train_test_split, AudioDataset
-from audio_model import AudioMLPModel1, AudioMLPModel2, AudioMLPModel3
+from model_audio import AudioMLPModel1, AudioMLPModel2, AudioMLPModel3, AudioRNNModel
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader
@@ -83,15 +83,16 @@ def evaluate(model, dataloader, criterion, metrics):
     return total_loss / len(dataloader), scores / len(dataloader)
 
 if __name__ == "__main__":
-    dataset = AudioDataset('labels.csv', 'data/audio/samples/')
+    dataset = AudioDataset('labels.csv', 'data/audio/samples/', mlp_audio=False)
     train_dataset, val_dataset, test_dataset = train_test_split(dataset)
     train_dataloader, val_dataloader, test_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=2, pin_memory=True), DataLoader(val_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=1, pin_memory=True), DataLoader(test_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=1, pin_memory=True)
 
-    model = AudioMLPModel1()
+    # model = AudioMLPModel1()
     # model = AudioMLPModel2()
     # model = AudioMLPModel3()
+    model = AudioRNNModel()
 
-    weight = torch.tensor([0.4, 0.6])
+    weight = torch.tensor([0.2, 0.8])
     # with torch.no_grad():
     #     total_label_1 = 0
     #     total_label_0 = 0
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     models_parameters = []
     non_valid_iteration = 0
     max_iter = 10
-    for epoch in range(30):
+    for epoch in range(100):
         train_loss = train(model, train_dataloader, criterion, optimizer)
         val_loss, val_scores = evaluate(model, val_dataloader, criterion, metrics)
         if epoch == 0:
@@ -132,17 +133,17 @@ if __name__ == "__main__":
             print(f"Epoch {epoch} - Training Loss: {train_loss} - Validation Loss: {val_loss} - Validation Scores (F1 score, accuracy_score, precision score, recall score): {val_scores}")
         training_loss.append(train_loss)
         validation_loss.append(val_loss)
-    pocket_model = AudioMLPModel1()
+    pocket_model = AudioRNNModel()
     pocket_model.load_state_dict(models_parameters[-1])
     
 
     plt.plot(training_loss, label="Training Loss")
     plt.plot(validation_loss, label="Validation Loss")
     plt.legend()
-    plt.savefig("data/audio_model_loss_test.png")
+    plt.savefig("data/ModelAudio/Graphs/audio_model_loss_RNN_V1.png")
         
-    torch.save(model.state_dict(), "data/audio_model_Early_test.pt")
-    torch.save(pocket_model.state_dict(), "data/audio_model_Early_pocket_test.pt")
+    torch.save(model.state_dict(), "data/ModelAudio/Models/audio_model_Early_RNN_V1.pt")
+    torch.save(pocket_model.state_dict(), "data/ModelAudio/Models/audio_model_Early_pocket_RNN_V1.pt")
     # model = AudioMLPModel3()
     # model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_MLP4VF.pt"))
 

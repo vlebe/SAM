@@ -12,8 +12,8 @@ import torchvision
 from torch.utils.data import DataLoader
 import numpy as np
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
-from video_model import VideoEmbedding
-from text_model import DistilCamembertEmbedding
+from model_video import VideoEmbedding
+from model_text import DistilCamembertEmbedding
 from transformers import AutoTokenizer
 
 

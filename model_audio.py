@@ -1,29 +1,26 @@
 import torch.nn as nn
 import torch
 
-class AudioLSTMModel(nn.Module):
-    def __init__(self):
-        super(AudioLSTMModel, self).__init__()
-        self.gru = nn.GRU(input_size=20, hidden_size=128, num_layers=1, batch_first=True, bidirectional=False)
-        # self.lstm = nn.LSTM(input_size=20, hidden_size=128, num_layers=1, batch_first=True, bidirectional=False)
+class AudioRNNModel(nn.Module):
+    def __init__(self, input_size=20, hidden_size=512, num_layers=1, num_classes=2):
+        super(AudioRNNModel, self).__init__()
+        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True, bidirectional=False)
         self.flatten = nn.Flatten()
-        self.linear1 = nn.Linear(128, 128*2)
-        self.linear2 = nn.Linear(128*2, 128*2)
-        self.linear3 = nn.Linear(128*2, 128)
-        self.linear4 = nn.Linear(128, 2)
+        self.linear1 = nn.Linear(hidden_size, hidden_size*2)
+        self.linear3 = nn.Linear(hidden_size*2, hidden_size//2)
+        self.linear4 = nn.Linear(hidden_size//2, num_classes)
         self.relu = nn.ReLU()
         self.dropout1 = nn.Dropout(0.2)
         self.dropout2 = nn.Dropout(0.5)
-        self.batchnorm1 = nn.BatchNorm1d(128*2)
-        self.batchnorm2 = nn.BatchNorm1d(128*2)
-        self.batchnorm3 = nn.BatchNorm1d(128)
+        self.batchnorm1 = nn.BatchNorm1d(hidden_size*2)
+        self.batchnorm2 = nn.BatchNorm1d(hidden_size*2)
+        self.batchnorm3 = nn.BatchNorm1d(hidden_size//2)
 
         
     def forward(self, x):
         x, _ = self.gru(x)
-        aggregated_output = torch.mean(x, dim=1)
-        x = self.dropout2(self.relu(self.batchnorm1(self.linear1(aggregated_output))))
-        x = self.dropout1(self.relu(self.batchnorm2(self.linear2(x))))
+        x = x[:, -1, :]
+        x = self.dropout2(self.relu(self.batchnorm1(self.linear1(x))))
         x = self.dropout1(self.relu(self.batchnorm3(self.linear3(x))))
         x = self.linear4(x)
         return x

@@ -1,7 +1,7 @@
 import torch 
-from video_model import VideoModelLateFusion1, VideoEmbedding
-from audio_model import AudioMLPModel1
-from text_model import TextModel, DistilCamembertEmbedding
+from model_video import VideoModelLateFusion1, VideoEmbedding
+from model_audio import AudioMLPModel1
+from model_text import TextModel, DistilCamembertEmbedding
 from dataset import Dataset, custom_collate_Dataset, train_test_split
 from torch.utils.data import DataLoader
 import argparse
@@ -128,7 +128,8 @@ if __name__ == "__main__" :
     parser.add_argument('--resolution', type=tuple, default=(3, 224, 224), help='resolution of the input images')
     parser.add_argument('--num_workers_training', type=int, default=10, help='number of workers, corresponding to number of CPU cores that want to be used for training. 6 is recommended if available.')
     parser.add_argument('--num_workers_evaluating', type=int, default=10, help='number of workers, corresponding to number of CPU cores that want to be used for testing. 1 is recommended if available.')
-    parser.add_argument('--input_size_audio', type=int, default=3960, help='input size of the audio model')
+    parser.add_argument('--input_size_audio_mlp', type=int, default=3960, help='input size of the audio model')
+    parser.add_argument('--input_size_audio_rnn', type=int, default=20, help='input size of the audio model')
     parser.add_argument('--input_size_text', type=int, default=768, help='input size of the audio model')
     args = parser.parse_args()
 
@@ -139,7 +140,7 @@ if __name__ == "__main__" :
     embedding_model_text = DistilCamembertEmbedding().to(device)
     tokenizer = AutoTokenizer.from_pretrained("cmarkea/distilcamembert-base", use_fast=False)
     model_video = VideoModelLateFusion1(input_size_video, args.hidden_size_video, args.num_layers_video, args.num_classes).to(device)
-    model_audio = AudioMLPModel1(args.input_size_audio, args.num_classes).to(device)
+    model_audio = AudioMLPModel1(args.input_size_audio_mlp, args.num_classes).to(device)
     model_text = TextModel(args.input_size_text, args.num_classes).to(device)
     model_video.load_state_dict(torch.load('model_video.pt'))
     model_audio.load_state_dict(torch.load('model_audio.pt'))   

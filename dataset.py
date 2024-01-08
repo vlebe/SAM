@@ -10,7 +10,9 @@ from torch.nn.utils.rnn import pad_sequence
 import torch
 import torchaudio
 from torchaudio.transforms import MFCC
-from video_model import VideoEmbedding
+from model_video import VideoEmbedding
+from tqdm import tqdm
+from model_audio import AudioMLPModel1, AudioRNNModel
 
 
 resolution = (3, 224, 224)
@@ -197,23 +199,22 @@ if __name__ == "__main__" :
     else:
         device = torch.device('cpu')
 
-    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution, (2048, 1, 1))
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_Dataset)
-    embedding_model = VideoEmbedding().to(device)
-    embedding_model.eval()
-    # for batch in dataloader:
-    #     labels, txt, mfcc, frame_sequence = batch
-    #     print(frame_sequence.size())
-    #     exemplar = frame_sequence[0][0]
-    #     exemplar = exemplar.unsqueeze(0)
-    #     print(exemplar.size())
-    #     print(embedding_model(exemplar).size())
+    # dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution, (2048, 1, 1))
+    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_Dataset, num_workers=10, pin_memory=True)
+    # for batch in tqdm(dataloader):
+    #     # labels, txt, mfcc, frame_sequence = batch
+    #     pass
 
-    # dataset = AudioDataset('labels.csv', 'data/audio/samples/')
-    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset)
-    # for batch in dataloader:
-    #     labels, mfcc = batch
-    #     print(mfcc.size())
+    dataset = AudioDataset('labels.csv', 'data/audio/samples/', mlp_audio=False)
+    model_audio = AudioRNNModel().to(device)
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset)
+    for batch in tqdm(dataloader):
+        labels, mfcc = batch
+        exemplar = mfcc.to(device)
+        outputs = model_audio(exemplar)
+
+
+
     # dataset = VideoDataset('labels.csv', 'data/video/dataset_frame/', resolution, (2048, 1, 1))
     # dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     # for batch in dataloader:
@@ -222,8 +223,8 @@ if __name__ == "__main__" :
     #     exemplar = frame_sequence[:, 0, :, :, :].to(device)
     #     print(exemplar.size())
     #     print(embedding_model(exemplar).size())
-    dataset = TextDataset('labels.csv', 'txt_data.csv')
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-    for batch in dataloader:
-        labels, txt = batch
-        print(len(txt))
+    # dataset = TextDataset('labels.csv', 'txt_data.csv')
+    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    # for batch in dataloader:
+    #     labels, txt = batch
+    #     print(len(txt))
