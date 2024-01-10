@@ -109,46 +109,46 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     metrics = [f1_score, accuracy_score, precision_score, recall_score]
 
-    training_loss = []
-    validation_loss = []
-    models_parameters = []
-    non_valid_iteration = 0
-    max_iter = 10
-    for epoch in range(100):
-        train_loss = train(model, train_dataloader, criterion, optimizer)
-        val_loss, val_scores = evaluate(model, val_dataloader, criterion, metrics)
-        if epoch == 0:
-            min_loss = val_loss
-        else:
-            min_loss = min(validation_loss)
-        if val_loss < min_loss:
-            models_parameters.append(model.state_dict())
-            non_valid_iteration = 0
-        else:
-            non_valid_iteration += 1
-        if non_valid_iteration == max_iter:
-            print(f"Early stopping at epoch {epoch+1} : train loss {train_loss} valid loss {val_loss}")
-            break
-        else:
-            print(f"Epoch {epoch} - Training Loss: {train_loss} - Validation Loss: {val_loss} - Validation Scores (F1 score, accuracy_score, precision score, recall score): {val_scores}")
-        training_loss.append(train_loss)
-        validation_loss.append(val_loss)
-    pocket_model = AudioRNNModel()
-    pocket_model.load_state_dict(models_parameters[-1])
+    # training_loss = []
+    # validation_loss = []
+    # models_parameters = []
+    # non_valid_iteration = 0
+    # max_iter = 10
+    # for epoch in range(100):
+    #     train_loss = train(model, train_dataloader, criterion, optimizer)
+    #     val_loss, val_scores = evaluate(model, val_dataloader, criterion, metrics)
+    #     if epoch == 0:
+    #         min_loss = val_loss
+    #     else:
+    #         min_loss = min(validation_loss)
+    #     if val_loss < min_loss:
+    #         models_parameters.append(model.state_dict())
+    #         non_valid_iteration = 0
+    #     else:
+    #         non_valid_iteration += 1
+    #     if non_valid_iteration == max_iter:
+    #         print(f"Early stopping at epoch {epoch+1} : train loss {train_loss} valid loss {val_loss}")
+    #         break
+    #     else:
+    #         print(f"Epoch {epoch} - Training Loss: {train_loss} - Validation Loss: {val_loss} - Validation Scores (F1 score, accuracy_score, precision score, recall score): {val_scores}")
+    #     training_loss.append(train_loss)
+    #     validation_loss.append(val_loss)
+    # pocket_model = AudioRNNModel()
+    # pocket_model.load_state_dict(models_parameters[-1])
     
 
-    plt.plot(training_loss, label="Training Loss")
-    plt.plot(validation_loss, label="Validation Loss")
-    plt.legend()
-    plt.savefig("data/ModelAudio/Graphs/audio_model_loss_RNN_V1.png")
+    # plt.plot(training_loss, label="Training Loss")
+    # plt.plot(validation_loss, label="Validation Loss")
+    # plt.legend()
+    # plt.savefig("data/ModelAudio/Graphs/audio_model_loss_RNN_V1.png")
         
-    torch.save(model.state_dict(), "data/ModelAudio/Models/audio_model_Early_RNN_V1.pt")
-    torch.save(pocket_model.state_dict(), "data/ModelAudio/Models/audio_model_Early_pocket_RNN_V1.pt")
-    # model = AudioMLPModel3()
-    # model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_MLP4VF.pt"))
+    # torch.save(model.state_dict(), "data/ModelAudio/Models/audio_model_Early_RNN_V1.pt")
+    # torch.save(pocket_model.state_dict(), "data/ModelAudio/Models/audio_model_Early_pocket_RNN_V1.pt")
+    model = AudioRNNModel()
+    model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_Early_RNN_V1.pt"))
 
     _, test_score = evaluate(model, test_dataloader, criterion, metrics)
-    _, pocket_test_score = evaluate(pocket_model, test_dataloader, criterion, metrics)
+    # _, pocket_test_score = evaluate(pocket_model, test_dataloader, criterion, metrics)
     print(f"Test Early Score: {test_score}")
-    print(f"Test Pocket Score: {pocket_test_score}")
+    # print(f"Test Pocket Score: {pocket_test_score}")
 

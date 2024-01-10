@@ -22,6 +22,10 @@ number_of_frames = 4
 def custom_collate_Dataset(batch):
     labels, txt, mfcc_list, frame_sequence = zip(*batch)
     # Pad each sequence individually and store them in a list
+#       File "/Users/jskaf/miniconda3/lib/python3.11/site-packages/torch/nn/utils/rnn.py", line 399, in pad_sequence
+#     return torch._C._nn.pad_sequence(sequences, batch_first, padding_value)
+#            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# RuntimeError: The size of tensor a (198) must match the size of tensor b (20) at non-singleton dimension 1, juste rajouter une condition pour eviter ce problème
     padded_mfcc_list = pad_sequence([mfcc for mfcc in mfcc_list], batch_first=True, padding_value=0)
 
     if len(padded_mfcc_list.shape) == 2 :

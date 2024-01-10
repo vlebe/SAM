@@ -157,47 +157,69 @@ if __name__ == '__main__':
         train_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
         validation_loader = DataLoader(validation_dataset, shuffle=True)
         test_loader = DataLoader(test_dataset, shuffle=True)
+    
+    # regarder la proportion de 0 et de 1 dans le train, valid et test loader
+    with torch.no_grad():
+        total_label_1_train = 0
+        total_label_0_train = 0
+        for labels, _ in tqdm(train_loader):
+            total_label_1_train += labels.sum()
+            total_label_0_train += (1-labels).sum()
+        print(total_label_1_train, total_label_0_train)
+        total_label_0_valid = 0
+        total_label_1_valid = 0
+        for labels, _ in tqdm(validation_loader):
+            total_label_1_valid += labels.sum()
+            total_label_0_valid += (1-labels).sum()
+        print(total_label_1_valid, total_label_0_valid)
+        total_label_0_test = 0
+        total_label_1_test = 0
+        for labels, _ in tqdm(test_loader):
+            total_label_1_test += labels.sum()
+            total_label_0_test += (1-labels).sum()
+        print(total_label_1_test, total_label_0_test)
+       
 
-    print("Start training...")
-    valid_losses = []
-    train_losses = []
-    non_valid_iteration = 0
-    models_parameters = []
-    for epoch in range(args.num_epochs):
-        train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
-        valid_loss, val_scores = validation(embedding_model, model, validation_loader, criterion, args.output_embedding_model_shape, metrics)
-        train_losses.append(train_loss)
-        if epoch == 0:
-            pass
-        elif valid_loss < min(valid_losses):
-            non_valid_iteration = 0
-            models_parameters.append(model.state_dict())
-        else:
-            non_valid_iteration += 1
-        valid_losses.append(valid_loss)
-        if non_valid_iteration == args.max_iter:
-            print(f"Early stopping at epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
-            pocket_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
-            pocket_model.load_state_dict(models_parameters[-1])
-            break
-        else:
-            print(f"Epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
-            print(f"Validation scores : {val_scores}")
+    # print("Start training...")
+    # valid_losses = []
+    # train_losses = []
+    # non_valid_iteration = 0
+    # models_parameters = []
+    # for epoch in range(args.num_epochs):
+    #     train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
+    #     valid_loss, val_scores = validation(embedding_model, model, validation_loader, criterion, args.output_embedding_model_shape, metrics)
+    #     train_losses.append(train_loss)
+    #     if epoch == 0:
+    #         pass
+    #     elif valid_loss < min(valid_losses):
+    #         non_valid_iteration = 0
+    #         models_parameters.append(model.state_dict())
+    #     else:
+    #         non_valid_iteration += 1
+    #     valid_losses.append(valid_loss)
+    #     if non_valid_iteration == args.max_iter:
+    #         print(f"Early stopping at epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
+    #         pocket_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
+    #         pocket_model.load_state_dict(models_parameters[-1])
+    #         break
+    #     else:
+    #         print(f"Epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
+    #         print(f"Validation scores : {val_scores}")
 
 
-    torch.save(model.state_dict(), 'data/ModelVideo/Models/model1VFV0EarlyStopping.pt')
-    torch.save(pocket_model.state_dict(), 'data/ModelVideo/Models/model1VFV0EarlyStoppingPocketAlgo.pt')
-    plt.plot(train_losses, label="Training Loss")
-    plt.plot(valid_losses, label="Validation Loss")
-    plt.legend()
-    plt.savefig("data/ModelVideo/Graphs/video_model_loss_model1VFV0.png")
+    # torch.save(model.state_dict(), 'data/ModelVideo/Models/model1VFV0EarlyStopping.pt')
+    # torch.save(pocket_model.state_dict(), 'data/ModelVideo/Models/model1VFV0EarlyStoppingPocketAlgo.pt')
+    # plt.plot(train_losses, label="Training Loss")
+    # plt.plot(valid_losses, label="Validation Loss")
+    # plt.legend()
+    # plt.savefig("data/ModelVideo/Graphs/video_model_loss_model1VFV0.png")
 
-    # model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
-    # model.load_state_dict(torch.load('data/ModelVideo/modelV3.pt'))
+    model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
+    model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV0EarlyStoppingPocketAlgo.pt'))
         
 
     test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)
-    test(embedding_model, pocket_model, test_loader, criterion, args.output_embedding_model_shape)
+    # test(embedding_model, pocket_model, test_loader, criterion, args.output_embedding_model_shape)
 
 
 

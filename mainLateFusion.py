@@ -1,6 +1,6 @@
 import torch 
 from model_video import VideoModelLateFusion1, VideoEmbedding
-from model_audio import AudioMLPModel1
+from model_audio import AudioMLPModel1, AudioRNNModel
 from model_text import TextModel, DistilCamembertEmbedding
 from dataset import Dataset, custom_collate_Dataset, train_test_split
 from torch.utils.data import DataLoader
@@ -50,6 +50,8 @@ def train(model, dataloader, criterion, optimizer, embedding_model_video, embedd
     total_loss = 0
     for batch in tqdm(dataloader):
         labels, txt, mfcc, frames = batch
+        if len(labels) == 1:
+            continue
         labels = labels.type(torch.LongTensor).to(device)
         mfcc = mfcc.to(device)
         frames = frames.to(device)
@@ -117,12 +119,12 @@ if __name__ == "__main__" :
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
-    parser.add_argument('--num_epochs', type=int, default=1, help='number of epochs to train for')
+    parser.add_argument('--num_epochs', type=int, default=100, help='number of epochs to train for')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate')
     parser.add_argument('--learning_rate_default', type=float, default=0.0001, help='learning rate for other layers')
     parser.add_argument('--hidden_size_video', type=int, default=512, help='hidden size')
     parser.add_argument('--num_layers_video', type=int, default=1, help='number of layers')
-    parser.add_argument('--max_iter', type=int, default=10, help='maximum number of iteration, witout any improvement on the train loss with tol equal to 1e-3')
+    parser.add_argument('--max_iter', type=int, default=20, help='maximum number of iteration, witout any improvement on the train loss with tol equal to 1e-3')
     parser.add_argument('--output_embedding_model_shape', type=tuple, default=(2048, 1, 1), help='output shape of the embedding model')
     parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--resolution', type=tuple, default=(3, 224, 224), help='resolution of the input images')
@@ -131,6 +133,7 @@ if __name__ == "__main__" :
     parser.add_argument('--input_size_audio_mlp', type=int, default=3960, help='input size of the audio model')
     parser.add_argument('--input_size_audio_rnn', type=int, default=20, help='input size of the audio model')
     parser.add_argument('--input_size_text', type=int, default=768, help='input size of the audio model')
+    parser.add_argument('--mlp_audio', action='store_true', default=False, help='use MLP audio model instead of RNN')
     args = parser.parse_args()
 
     resolution = (3, 224, 224)
@@ -140,14 +143,15 @@ if __name__ == "__main__" :
     embedding_model_text = DistilCamembertEmbedding().to(device)
     tokenizer = AutoTokenizer.from_pretrained("cmarkea/distilcamembert-base", use_fast=False)
     model_video = VideoModelLateFusion1(input_size_video, args.hidden_size_video, args.num_layers_video, args.num_classes).to(device)
-    model_audio = AudioMLPModel1(args.input_size_audio_mlp, args.num_classes).to(device)
+    # model_audio = AudioMLPModel1(args.input_size_audio_mlp, args.num_classes).to(device)
+    model_audio = AudioRNNModel(input_size=args.input_size_audio_rnn, num_classes=args.num_classes).to(device)
     model_text = TextModel(args.input_size_text, args.num_classes).to(device)
-    model_video.load_state_dict(torch.load('model_video.pt'))
-    model_audio.load_state_dict(torch.load('model_audio.pt'))   
-    model_text.load_state_dict(torch.load('model_text.pt'))
+    model_video.load_state_dict(torch.load('data/ModelLateFusion/Models/model_video.pt'))
+    model_audio.load_state_dict(torch.load('data/ModelLateFusion/Models/model_audio.pt'))   
+    model_text.load_state_dict(torch.load('data/ModelLateFusion/Models/model_text.pt'))
     model = LateFusionModel(model_video, model_audio, model_text).to(device)
     
-    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', args.resolution, args.output_embedding_model_shape)
+    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', args.resolution, args.output_embedding_model_shape, mlp_audio=args.mlp_audio)
     train_dataset, validation_dataset, test_dataset = train_test_split(dataset, test_size=0.10, val_size=0.15)
     workers = True
     if (device == torch.device('cuda') or device == torch.device('mps')) and workers:
@@ -159,7 +163,8 @@ if __name__ == "__main__" :
         validation_loader = DataLoader(validation_dataset, shuffle=True, collate_fn=custom_collate_Dataset)
         test_loader = DataLoader(test_dataset, shuffle=True, collate_fn=custom_collate_Dataset)
     
-    criterion = torch.nn.CrossEntropyLoss().to(device)
+    weights = torch.tensor([0.1, 0.9]).to(device)
+    criterion = torch.nn.CrossEntropyLoss(weight=weights).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     train_losses = []
