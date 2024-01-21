@@ -21,7 +21,7 @@ from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_sc
 def train(embedding_model, model, train_loader, optimizer, criterion, output_embedding_model_shape):
     print("Training...")
     model.train()
-    embedding_model.train()
+    embedding_model.eval()
     running_loss = 0.0
     for labels, frames in tqdm(train_loader):
         labels = labels.type(torch.LongTensor).to(device)
@@ -125,7 +125,10 @@ if __name__ == '__main__':
     parser.add_argument('--output_embedding_model_shape', type=tuple, default=(2048, 1, 1), help='output shape of the embedding model')
     parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--resolution', type=tuple, default=(3, 224, 224), help='resolution of the input images')
-    parser.add_argument('--num_workers', type=int, default=10, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
+    parser.add_argument('--num_workers', type=int, default=10, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing.')
+    parser.add_argument('--save_model', action='store_true', default=True, help='save model or not')
+    parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
+    parser.add_argument('--save_model_path', type=str, default='data/ModelVideo/Models/', help='path to save model')
     args = parser.parse_args()
     input_size = args.output_embedding_model_shape[0] * args.output_embedding_model_shape[1] * args.output_embedding_model_shape[2]
 
@@ -138,12 +141,9 @@ if __name__ == '__main__':
 
     model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
     embedding_model = VideoEmbedding().to(device)
-
     weights = torch.tensor([0.2, 0.8]).to(device)
-
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     criterion = nn.CrossEntropyLoss(weight=weights).to(device)
-    # criterion = nn.CrossEntropyLoss().to(device)
     metrics = [accuracy_score, f1_score, precision_score, recall_score]
 
     dataset = VideoDataset('labels.csv', 'data/video/dataset_frame/', args.resolution, args.output_embedding_model_shape)
@@ -179,47 +179,51 @@ if __name__ == '__main__':
             total_label_0_test += (1-labels).sum()
         print(total_label_1_test, total_label_0_test)
        
+    if args.save_model:
+        print("Start training...")
+        valid_losses = []
+        train_losses = []
+        non_valid_iteration = 0
+        models_parameters = []
+        for epoch in range(args.num_epochs):
+            train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
+            valid_loss, val_scores = validation(embedding_model, model, validation_loader, criterion, args.output_embedding_model_shape, metrics)
+            train_losses.append(train_loss)
+            if epoch == 0:
+                pass
+            elif valid_loss < min(valid_losses):
+                non_valid_iteration = 0
+                models_parameters.append(model.state_dict())
+            else:
+                non_valid_iteration += 1
+            valid_losses.append(valid_loss)
+            if non_valid_iteration == args.max_iter:
+                print(f"Early stopping at epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
+                break
+            else:
+                print(f"Epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
+                print(f"Validation scores : {val_scores}")
 
-    # print("Start training...")
-    # valid_losses = []
-    # train_losses = []
-    # non_valid_iteration = 0
-    # models_parameters = []
-    # for epoch in range(args.num_epochs):
-    #     train_loss = train(embedding_model, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
-    #     valid_loss, val_scores = validation(embedding_model, model, validation_loader, criterion, args.output_embedding_model_shape, metrics)
-    #     train_losses.append(train_loss)
-    #     if epoch == 0:
-    #         pass
-    #     elif valid_loss < min(valid_losses):
-    #         non_valid_iteration = 0
-    #         models_parameters.append(model.state_dict())
-    #     else:
-    #         non_valid_iteration += 1
-    #     valid_losses.append(valid_loss)
-    #     if non_valid_iteration == args.max_iter:
-    #         print(f"Early stopping at epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
-    #         pocket_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
-    #         pocket_model.load_state_dict(models_parameters[-1])
-    #         break
-    #     else:
-    #         print(f"Epoch {epoch+1} : train loss {train_loss} valid loss {valid_loss}")
-    #         print(f"Validation scores : {val_scores}")
+        if len(models_parameters) != 0:
+            pocket_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
+            pocket_model.load_state_dict(models_parameters[-1])
+            torch.save(pocket_model.state_dict(), 'data/ModelVideo/Models/model1VFV0EarlyStoppingPocketAlgo.pt')
+        torch.save(model.state_dict(), 'data/ModelVideo/Models/model1VFV0EarlyStopping.pt')
+        plt.plot(train_losses, label="Training Loss")
+        plt.plot(valid_losses, label="Validation Loss")
+        plt.legend()
+        plt.savefig("data/ModelVideo/Graphs/video_model_loss_model1VFV0.png")
+        test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)
+        if len(models_parameters) != 0:
+            test(embedding_model, pocket_model, test_loader, criterion, args.output_embedding_model_shape)
 
-
-    # torch.save(model.state_dict(), 'data/ModelVideo/Models/model1VFV0EarlyStopping.pt')
-    # torch.save(pocket_model.state_dict(), 'data/ModelVideo/Models/model1VFV0EarlyStoppingPocketAlgo.pt')
-    # plt.plot(train_losses, label="Training Loss")
-    # plt.plot(valid_losses, label="Validation Loss")
-    # plt.legend()
-    # plt.savefig("data/ModelVideo/Graphs/video_model_loss_model1VFV0.png")
-
-    model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
-    model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV0EarlyStoppingPocketAlgo.pt'))
-        
-
-    test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)
-    # test(embedding_model, pocket_model, test_loader, criterion, args.output_embedding_model_shape)
+    if args.load_model:
+        print("Loading model...")
+        model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV0EarlyStopping.pt'))
+        pocket_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
+        pocket_model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV0EarlyStoppingPocketAlgo.pt'))
+        test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)
+        test(embedding_model, pocket_model, test_loader, criterion, args.output_embedding_model_shape)
 
 
 

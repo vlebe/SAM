@@ -16,6 +16,14 @@ class DistilCamembertEmbedding(nn.Module):
         self.embedding_model.eval()
         output = self.embedding_model(input_ids, attention_mask)
         return output.last_hidden_state[:, 0, :]
+    
+    def get_architecture(self):
+        frozen_layers = []
+        learnable_layers = []
+        with open('embedding_text_model.txt', 'w') as f :
+            for name, param in self.embedding_model.named_parameters():
+                f.write('--------------------------LAYERS--------------------------' + '\n')
+                f.write(str(name) + '\n')
 
 class FlaubertEmbedding(nn.Module):
     def __init__(self):

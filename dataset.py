@@ -10,7 +10,6 @@ from torch.nn.utils.rnn import pad_sequence
 import torch
 import torchaudio
 from torchaudio.transforms import MFCC
-from model_video import VideoEmbedding
 from tqdm import tqdm
 from model_audio import AudioMLPModel1, AudioRNNModel
 
@@ -21,11 +20,6 @@ number_of_frames = 4
 
 def custom_collate_Dataset(batch):
     labels, txt, mfcc_list, frame_sequence = zip(*batch)
-    # Pad each sequence individually and store them in a list
-#       File "/Users/jskaf/miniconda3/lib/python3.11/site-packages/torch/nn/utils/rnn.py", line 399, in pad_sequence
-#     return torch._C._nn.pad_sequence(sequences, batch_first, padding_value)
-#            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# RuntimeError: The size of tensor a (198) must match the size of tensor b (20) at non-singleton dimension 1, juste rajouter une condition pour eviter ce problème
     padded_mfcc_list = pad_sequence([mfcc for mfcc in mfcc_list], batch_first=True, padding_value=0)
 
     if len(padded_mfcc_list.shape) == 2 :
@@ -203,11 +197,11 @@ if __name__ == "__main__" :
     else:
         device = torch.device('cpu')
 
-    # dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution, (2048, 1, 1))
-    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_Dataset, num_workers=10, pin_memory=True)
-    # for batch in tqdm(dataloader):
-    #     # labels, txt, mfcc, frame_sequence = batch
-    #     pass
+    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution, (2048, 1, 1))
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_Dataset, num_workers=10, pin_memory=True)
+    for batch in tqdm(dataloader):
+        # labels, txt, mfcc, frame_sequence = batch
+        pass
 
     dataset = AudioDataset('labels.csv', 'data/audio/samples/', mlp_audio=False)
     model_audio = AudioRNNModel().to(device)
@@ -217,18 +211,16 @@ if __name__ == "__main__" :
         exemplar = mfcc.to(device)
         outputs = model_audio(exemplar)
 
+    dataset = VideoDataset('labels.csv', 'data/video/dataset_frame/', resolution, (2048, 1, 1))
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    for batch in dataloader:
+        labels, frame_sequence = batch
+        print(frame_sequence.size())
+        exemplar = frame_sequence[:, 0, :, :, :].to(device)
+        print(exemplar.size())
 
-
-    # dataset = VideoDataset('labels.csv', 'data/video/dataset_frame/', resolution, (2048, 1, 1))
-    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-    # for batch in dataloader:
-    #     labels, frame_sequence = batch
-    #     print(frame_sequence.size())
-    #     exemplar = frame_sequence[:, 0, :, :, :].to(device)
-    #     print(exemplar.size())
-    #     print(embedding_model(exemplar).size())
-    # dataset = TextDataset('labels.csv', 'txt_data.csv')
-    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-    # for batch in dataloader:
-    #     labels, txt = batch
-    #     print(len(txt))
+    dataset = TextDataset('labels.csv', 'txt_data.csv')
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    for batch in dataloader:
+        labels, txt = batch
+        print(len(txt))

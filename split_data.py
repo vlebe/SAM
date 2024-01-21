@@ -18,33 +18,23 @@ def save_labels(data) :
 def split_and_save_audio_ipu(data, audio_dir, audio_sample_dir) :
     if not os.path.exists(audio_sample_dir) :
         os.makedirs(audio_sample_dir)
-        
     df = data[['speaker', "start", 'stop', 'dyad']]
-    
     for i, tf, ts in tqdm(zip(df.index, df.start, df.stop)):
-
         if ts - tf > 2 :
             tf = ts - 2
-
         audio = data['dyad'][i]
-
         os.makedirs(audio_sample_dir + f"{audio}/", exist_ok=True)
-
         speaker = data['speaker'][i]
         if type(speaker) != str :
             speaker = "NA"
-
         file_path = audio_dir + f"{audio}_{speaker}.wav"
-
         fs, x = wavfile.read(file_path)
         start = int(tf * fs)
         stop = int(ts * fs)
         audio_sample = x[start:stop]
-
         wavfile.write(audio_sample_dir + f"{audio}/" + f"{audio}_{speaker}_{i}.wav", fs, audio_sample)
 
 def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
-
     # Create a VideoCapture object
     cap = cv2.VideoCapture(input_video_path, cv2.CAP_FFMPEG)
     speaker1, speaker2 = video_path.split('_')
@@ -70,7 +60,6 @@ def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
 
     # Get the frames per second (fps) and frame size
     fps = cap.get(cv2.CAP_PROP_FPS)
-
     for i in tqdm(range(df.shape[0])):
         line = df.iloc[i]
         start_time = line.start
@@ -87,31 +76,24 @@ def extract_video(df, input_video_path, output_video_path,video_path, nb_frame):
         try:
             os.makedirs(output_video_path + name_ipu)
             num = 0
-            
             for frame_num in range(start_temp, stop_frame):
-
                 ret, frame = cap.read()
-
                 if not ret:
                     raise("Error: Unable to read frame.")
-
                 # Write the frame to the output video
                 output_name = output_video_path + name_ipu + "/" + f'{num}.jpeg'
                 cv2.imwrite(output_name, frame)
                 num+=1
-
         except FileExistsError:
             print("Folder of frames already exists !")
 
     # Release the VideoCapture and VideoWriter objects
     cap.release()
-
     print(f"Extracted video saved to {output_video_path}")
 
 def split_and_save_video_ipu(data, input_videos_path,output_videos_path,nb_frame):
     if not os.path.exists(input_videos_path) :
         raise FileNotFoundError("Input videos path not found")
-
     if not os.path.exists(output_videos_path) :
         os.makedirs(output_videos_path)
 
@@ -119,7 +101,6 @@ def split_and_save_video_ipu(data, input_videos_path,output_videos_path,nb_frame
     for video_path in videos_path_cheese :
         input_video_path = input_videos_path + "cheese/" + video_path
         extract_video(data, input_video_path, output_videos_path, video_path, nb_frame)
-
     videos_path_paco = os.listdir(input_videos_path + "paco/")
     for video_path in videos_path_paco :
         input_video_path = input_videos_path + "paco/" + video_path
@@ -127,18 +108,13 @@ def split_and_save_video_ipu(data, input_videos_path,output_videos_path,nb_frame
 
 
 def main(args):
-    
     data = pd.read_csv(args.file_path)
-
-    # save_txt_data(data)
-    # print("Txt data saved")
-
-    # save_labels(data)
-    # print("Labels saved")
-
-    # split_and_save_audio_ipu(data, args.audio_dir, args.audio_sample_dir)
-    # print("Audio splitted and saved")
-
+    save_txt_data(data)
+    print("Txt data saved")
+    save_labels(data)
+    print("Labels saved")
+    split_and_save_audio_ipu(data, args.audio_dir, args.audio_sample_dir)
+    print("Audio splitted and saved")
     split_and_save_video_ipu(data,args.video_dir, args.frame_dir,args.nb_frame)
     print("Video splitted and saved")
 
@@ -152,5 +128,4 @@ if __name__ == "__main__" :
     parser.add_argument("--frame_dir", type=str, default="data/video/dataset_frame/", help="Directory for video frames")
     parser.add_argument("--sampling_rate", type=int, default=4, help="Sampling rate for video frames")
     parser.add_argument("--nb_frame", type=int, default=4, help="Minimum frames for an IPU video")
-
     main(parser.parse_args())
