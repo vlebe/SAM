@@ -154,7 +154,15 @@ if __name__ == "__main__" :
     model = LateFusionModel(model_video, model_audio, model_text).to(device)
     
     dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', args.resolution, args.output_embedding_model_shape, mlp_audio=args.mlp_audio)
-    train_dataset, validation_dataset, test_dataset = train_test_split(dataset, test_size=0.10, val_size=0.15)
+    labels = dataset.labels["turn_after"].values
+    #Doing the same but by using subset and indices
+    class_0_indices = [i for i in range(len(dataset)) if labels[i] == 0]
+    class_1_indices = [i for i in range(len(dataset)) if labels[i] == 1]
+    #subsampling randomly class 0 to have the same number of samples as class 1
+    subsampled_indices_0 = np.random.choice(class_0_indices, len(class_1_indices), replace=False)
+    subsampled_indices = subsampled_indices_0.tolist() + class_1_indices
+    subdataset = torch.utils.data.Subset(dataset, subsampled_indices)
+    train_dataset, validation_dataset, test_dataset = train_test_split(subdataset, test_size=0.10, val_size=0.15)
     workers = True
     if (device == torch.device('cuda') or device == torch.device('mps')) and workers:
         train_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers_training, pin_memory=True, collate_fn=custom_collate_Dataset)

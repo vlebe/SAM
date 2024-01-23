@@ -52,6 +52,65 @@ class TextModel(nn.Module):
         x = self.fo(x)
         return x
     
+    
+class TextModel2(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(TextModel2, self).__init__()
+        self.fc1 = nn.Linear(input_size, input_size*2)
+        self.batchnorm1 = nn.BatchNorm1d(input_size*2)
+        self.fc2 = nn.Linear(input_size*2, input_size//16)
+        self.batchnorm2 = nn.BatchNorm1d(input_size//16)
+        self.fo = nn.Linear(input_size//16, num_classes)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=0.5)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.batchnorm1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.batchnorm2(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fo(x)
+        return x
+
+class TextModel3(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(TextModel3, self).__init__()
+        self.fc1 = nn.Linear(input_size, input_size*2)
+        self.batchnorm1 = nn.BatchNorm1d(input_size*2)
+        self.fc2 = nn.Linear(input_size*2, input_size*2)
+        self.batchnorm2 = nn.BatchNorm1d(input_size*2)
+        self.fc3 = nn.Linear(input_size*2, input_size//8)
+        self.batchnorm3 = nn.BatchNorm1d(input_size//8)
+        self.fc4 = nn.Linear(input_size//8, input_size//16)
+        self.batchnorm4 = nn.BatchNorm1d(input_size//16)
+        self.fo = nn.Linear(input_size//16, num_classes)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=0.5)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.batchnorm1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.batchnorm2(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc3(x)
+        x = self.batchnorm3(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc4(x)
+        x = self.batchnorm4(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fo(x)
+        return x
+    
 
 if __name__ == "__main__":
     print("Bonjour je suis un test")

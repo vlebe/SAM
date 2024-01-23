@@ -2,7 +2,7 @@ from dataset import custom_collate_AudioDataset, train_test_split, AudioDataset
 from model_audio import AudioMLPModel1, AudioMLPModel2, AudioMLPModel3, AudioRNNModel
 import matplotlib.pyplot as plt
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 import numpy as np 
@@ -109,9 +109,17 @@ if __name__ == "__main__":
     
 
     dataset = AudioDataset('labels.csv', 'data/audio/samples/', mlp_audio=False)
-    train_dataset, val_dataset, test_dataset = train_test_split(dataset)
+    labels = dataset.labels["turn_after"].values
+    #Doing the same but by using subset and indices
+    class_0_indices = [i for i in range(len(dataset)) if labels[i] == 0]
+    class_1_indices = [i for i in range(len(dataset)) if labels[i] == 1]
+    #subsampling randomly class 0 to have the same number of samples as class 1
+    subsampled_indices_0 = np.random.choice(class_0_indices, len(class_1_indices), replace=False)
+    subsampled_indices = subsampled_indices_0.tolist() + class_1_indices
+    subdataset = torch.utils.data.Subset(dataset, subsampled_indices)
+    train_dataset, validation_dataset, test_dataset = train_test_split(subdataset, test_size=0.10, val_size=0.15)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=args.num_workers, pin_memory=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=1, pin_memory=True)
+    val_dataloader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=1, pin_memory=True)
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_AudioDataset, num_workers=1, pin_memory=True)
 
     # model = AudioMLPModel1()
