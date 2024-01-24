@@ -109,8 +109,8 @@ if __name__ == "__main__":
         test_loader = DataLoader(test_dataset, shuffle=True, num_workers=1, pin_memory=True)
     else:
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        validation_loader = DataLoader(validation_dataset, shuffle=True)
-        test_loader = DataLoader(test_dataset, shuffle=True)
+        validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True)
 
     print(len(train_loader))
     # weights = torch.tensor([1.0, 1.0])
@@ -123,7 +123,6 @@ if __name__ == "__main__":
 
     if args.save_model:
         models_parameters = []
-        min_val_loss = float('inf')
         train_losses = []
         val_losses = []
         iter_non_valid = 0
