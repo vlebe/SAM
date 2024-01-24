@@ -74,8 +74,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
     parser.add_argument('--num_epochs', type=int, default=100, help='number of epochs to train for')
-    parser.add_argument('--learning_rate', type=float, default=0.00007, help='learning rate')
-    parser.add_argument('--max_iter', type=int, default=20, help='maximum number of iteration, witout any improvement on the train loss with tol equal to 1e-3')
+    parser.add_argument('--learning_rate', type=float, default=0.00001, help='learning rate')
+    parser.add_argument('--max_iter', type=int, default=2, help='maximum number of iteration, witout any improvement on the train loss with tol equal to 1e-3')
     parser.add_argument('--output_embedding_model_shape', type=int, default=768, help='output shape of the embedding model')
     parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--num_workers', type=int, default=1, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
@@ -132,12 +132,10 @@ if __name__ == "__main__":
                 break
             if not(early_stopping):
                 train_loss = train(embedding_model, model, train_loader, criterion, optimizer, device)
-                train_losses.append(train_loss)
                 val_loss, val_scores = evaluate(embedding_model, model, validation_loader, criterion, metrics, device)
-                val_losses.append(val_loss)
                 if epoch == 0:
                     min_val_loss = val_loss
-                elif val_loss < min_val_loss:
+                elif val_loss < min(val_losses):
                     min_val_loss = val_loss
                     iter_non_valid = 0
                     models_parameters.append(model.state_dict())
@@ -145,18 +143,20 @@ if __name__ == "__main__":
                     iter_non_valid += 1
                     if iter_non_valid == args.max_iter:
                         early_stopping = True
+                val_losses.append(val_loss)
+                train_losses.append(train_loss)
             print("Epoch {} : Train Loss = {}, Val Loss = {}, Val Scores = {}".format(epoch, train_loss, val_loss, val_scores))
         plt.plot(train_losses, label="Training Loss")
         plt.plot(val_losses, label="Validation Loss")
         plt.legend()
-        plt.savefig("data/ModelText/Graphs/text_model_lossV2.2.png")
-        torch.save(model.state_dict(), "data/ModelText/Models/text_model_EarlyV2.2.pt")
+        plt.savefig("data/ModelText/Graphs/text_model_lossVtest.png")
+        torch.save(model.state_dict(), "data/ModelText/Models/text_model_EarlyVtest.pt")
         test_loss, test_scores = evaluate(embedding_model, model, test_loader, criterion, metrics, device)
         print("Test Loss = {}, Test Scores = {}".format(test_loss, test_scores))
         if len(models_parameters) > 0:
             pocket_model = TextModel2(args.output_embedding_model_shape, args.num_classes).to(device)
             pocket_model.load_state_dict(models_parameters[-1])
-            torch.save(models_parameters[-1], "data/ModelText/Models/text_model_Early_Pocket_AlgoV2.2.pt")
+            torch.save(models_parameters[-1], "data/ModelText/Models/text_model_Early_Pocket_AlgoVtest.pt")
             pocket_test_loss, pocket_test_scores = evaluate(embedding_model, pocket_model, test_loader, criterion, metrics, device) 
             print("Pocket Test Loss = {}, Pocket Test Scores = {}".format(pocket_test_loss, pocket_test_scores))
     
