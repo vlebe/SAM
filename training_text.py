@@ -8,6 +8,7 @@ from model_text import TextModel, TextModel2, TextModel3, DistilCamembertEmbeddi
 from transformers import AutoTokenizer
 import matplotlib.pyplot as plt
 import argparse
+from utils import EarlyStopping
 
 
 
@@ -118,6 +119,7 @@ if __name__ == "__main__":
     criterion = torch.nn.CrossEntropyLoss(weight=weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     metrics = [accuracy_score, f1_score, precision_score, recall_score]
+    early_stopping = EarlyStopping()
 
     if args.save_model:
         models_parameters = []
@@ -127,25 +129,17 @@ if __name__ == "__main__":
         val_losses = []
         iter_non_valid = 0
         for epoch in range(args.num_epochs):
-            if early_stopping:
+            train_loss = train(embedding_model, model, train_loader, criterion, optimizer, device)
+            val_loss, val_scores = evaluate(embedding_model, model, validation_loader, criterion, metrics, device)
+            early_stopping(val_loss, model)
+            val_losses.append(val_loss)
+            train_losses.append(train_loss)
+            print("Epoch {} : Train Loss = {}, Val Loss = {}, Val Scores = {}".format(epoch, train_loss, val_loss, val_scores))
+
+            if early_stopping.early_stop:
                 print("Early stopping")
                 break
-            if not(early_stopping):
-                train_loss = train(embedding_model, model, train_loader, criterion, optimizer, device)
-                val_loss, val_scores = evaluate(embedding_model, model, validation_loader, criterion, metrics, device)
-                if epoch == 0:
-                    min_val_loss = val_loss
-                elif val_loss < min(val_losses):
-                    min_val_loss = val_loss
-                    iter_non_valid = 0
-                    models_parameters.append(model.state_dict())
-                else:
-                    iter_non_valid += 1
-                    if iter_non_valid == args.max_iter:
-                        early_stopping = True
-                val_losses.append(val_loss)
-                train_losses.append(train_loss)
-            print("Epoch {} : Train Loss = {}, Val Loss = {}, Val Scores = {}".format(epoch, train_loss, val_loss, val_scores))
+
         plt.plot(train_losses, label="Training Loss")
         plt.plot(val_losses, label="Validation Loss")
         plt.legend()
