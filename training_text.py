@@ -105,8 +105,8 @@ if __name__ == "__main__":
     train_dataset, validation_dataset, test_dataset = train_test_split(subdataset, test_size=0.10, val_size=0.15)
     if device == torch.device('cuda') or device == torch.device('mps'):
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
-        validation_loader = DataLoader(validation_dataset, shuffle=True, num_workers=1, pin_memory=True)
-        test_loader = DataLoader(test_dataset, shuffle=True, num_workers=1, pin_memory=True)
+        validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True, num_workers=1, pin_memory=True)
+        test_loader = DataLoader(test_dataset, shuffle=True, batch_size=args.batch_size, num_workers=1, pin_memory=True)
     else:
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True)
