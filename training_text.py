@@ -123,7 +123,6 @@ if __name__ == "__main__":
 
     if args.save_model:
         models_parameters = []
-        early_stopping = False
         min_val_loss = float('inf')
         train_losses = []
         val_losses = []
