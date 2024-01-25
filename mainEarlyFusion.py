@@ -195,23 +195,20 @@ if __name__ == '__main__':
         plt.savefig("data/ModelEarlyFusion/Graphs/ModelEarlyVFV0Imbalanced.png")
         torch.save(model.state_dict(), 'data/ModelLateFusion/Models/ModelEarlyVFV0Imbalanced.pt')
         _, test_scores = evaluate(embedding_model_video,embedding_model_text, model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
-        print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
+        print(f"Test Scores F1 score : {test_scores[0]}, accuracy_score : {test_scores[1]}, precision score : {test_scores[2]}, recall score : {test_scores[3]}")
     
     if args.load_model:
-        print("Loading model...")
-        model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes)
-        model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/model_EarlyFusion_Balanced.pt', map_location=torch.device('cpu')))
-        model.to(device)
-        _, test_scores = evaluate(embedding_model_video,embedding_model_text, model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
-        print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
-        try :
-            pocket_model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes)
-            pocket_model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/model_EarlyFusion_Imblanced.pt', map_location=torch.device('cpu')))
-            pocket_model.to(device)
-            _, pocket_test_scores = evaluate(embedding_model_video,embedding_model_text, pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
-            print(f"Pocket Test Scores (F1 score, accuracy_score, precision score, recall score): {pocket_test_scores}")
-        except :
-            print("No early stopping model or wrong path")
+        print("Loading balanced and imbalanced models...")
+        balanced_model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes)
+        balanced_model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/model_EarlyFusion_Balanced.pt', map_location=torch.device('cpu')))
+        balanced_model.to(device)
+        _, balanced_test_scores = evaluate(embedding_model_video,embedding_model_text, balanced_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
+        print(f"Balanced Test Scores F1 score : {balanced_test_scores[0]}, accuracy_score : {balanced_test_scores[1]}, precision score : {balanced_test_scores[2]}, recall score : {balanced_test_scores[3]}")
+        imbalanced_model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes)
+        imbalanced_model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/model_EarlyFusion_Imbalanced.pt', map_location=torch.device('cpu')))
+        imbalanced_model.to(device)
+        _, imbalanced_test_scores = evaluate(embedding_model_video,embedding_model_text, imbalanced_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
+        print(f"Imbalanced Test Scores F1 score : {imbalanced_test_scores[0]}, accuracy_score : {imbalanced_test_scores[1]}, precision score : {imbalanced_test_scores[2]}, recall score : {imbalanced_test_scores[3]}")
 
     
 

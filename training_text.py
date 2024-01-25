@@ -147,18 +147,17 @@ if __name__ == "__main__":
     
     if args.load_model:
         print("Loading model...")
-        model = model.to(torch.device('cpu'))
-        model.load_state_dict(torch.load("data/ModelText/Models/text_model_VFBalanced.pt", map_location=torch.device('cpu')))
-        model.to(device)
-        test_loss, test_scores = evaluate(embedding_model, model, test_loader, criterion, metrics, device)
-        print("Test Loss = {}, Test Scores = {}".format(test_loss, test_scores))
-        try :
-            pocket_model = TextModel2(args.output_embedding_model_shape, args.num_classes)
-            pocket_model.load_state_dict(torch.load("data/ModelText/Models/text_model_VFImbalanced.pt", map_location=torch.device('cpu')))
-            pocket_model.to(device) 
-            pocket_test_loss, pocket_test_scores = evaluate(embedding_model, pocket_model, test_loader, criterion, metrics, device) 
-            print("Pocket Test Loss = {}, Pocket Test Scores = {}".format(pocket_test_loss, pocket_test_scores))
-        except:
-            print("No early stopping model or wrong path")
+        balanced_model = TextModel2(args.output_embedding_model_shape, args.num_classes)
+        balanced_model.to(torch.device('cpu'))
+        balanced_model.load_state_dict(torch.load("data/ModelText/Models/text_model_VFBalanced.pt", map_location=torch.device('cpu')))
+        balanced_model.to(device)
+        _, balanced_test_scores = evaluate(embedding_model, balanced_model, test_loader, criterion, metrics, device)
+        print("Balanced Test Scores  Accuracy = {},F1 score = {}, Precision = {}, Recall = {}".format(balanced_test_scores[0], balanced_test_scores[1], balanced_test_scores[2], balanced_test_scores[3]))
+        imbalanced_model = TextModel2(args.output_embedding_model_shape, args.num_classes)
+        imbalanced_model.to(torch.device('cpu'))
+        imbalanced_model.load_state_dict(torch.load("data/ModelText/Models/text_model_VFImbalanced.pt", map_location=torch.device('cpu')))
+        imbalanced_model.to(device)
+        _, imbalanced_test_scores = evaluate(embedding_model, imbalanced_model, test_loader, criterion, metrics, device)
+        print("Imbalanced Test Scores  Accuracy = {},F1 score = {}, Precision = {}, Recall = {}".format(imbalanced_test_scores[0], imbalanced_test_scores[1], imbalanced_test_scores[2], imbalanced_test_scores[3]))
         
 

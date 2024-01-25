@@ -197,18 +197,19 @@ if __name__ == '__main__':
 
     if args.load_model:
         print("Loading model...")
-        model.to(torch.device('cpu'))
-        model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV1Balance.pt', map_location=torch.device('cpu')))
-        model.to(device)
-        test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)
-        try: 
-            pocket_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes)
-            pocket_model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV1EarlyStoppingBalance.pt', map_location=torch.device('cpu')))
-            pocket_model.to(device)
-            test(embedding_model, pocket_model, test_loader, criterion, args.output_embedding_model_shape)
-        except:
-            print("No early stopping model or wrong path")
+        balanced_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes)
+        balanced_model.to(torch.device('cpu'))
+        balanced_model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV1EarlyStoppingBalance.pt', map_location=torch.device('cpu')))
+        balanced_model.to(device)
+        print("Testing balanced model")
+        test(embedding_model, balanced_model, test_loader, criterion, args.output_embedding_model_shape)
 
+        imbalanced_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes)
+        imbalanced_model.to(torch.device('cpu'))
+        imbalanced_model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV1EarlyStoppingImbalance.pt', map_location=torch.device('cpu')))
+        imbalanced_model.to(device)
+        print("Testing imbalanced model")
+        test(embedding_model, imbalanced_model, test_loader, criterion, args.output_embedding_model_shape)
 
 
 

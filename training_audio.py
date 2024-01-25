@@ -160,17 +160,15 @@ if __name__ == "__main__":
 
     if args.load_model:
         print("Loading model")
-        model.to(torch.device('cpu'))
-        model.load_state_dict(torch.load("data/ModelAudio/Models/audio_modelRNN_VF_Balanced.pt", map_location=torch.device('cpu')))
-        model.to(device)
-        _, test_score = evaluate(model, test_dataloader, criterion, metrics)
-        print(f"Test Early Score: {test_score}")
-        try :
-            pocket_model = AudioRNNModel()
-            pocket_model.load_state_dict(torch.load("data/ModelAudio/Models/audio_modelRNN_VF_Imbalanced.pt", map_location=torch.device('cpu')))
-            pocket_model.to(device)
-            _, pocket_test_score = evaluate(pocket_model, test_dataloader, criterion, metrics)
-            print(f"Test Pocket Score: {pocket_test_score}")
-        except:
-            print("No early stopping model or wrong path")
+        balanced_model = AudioRNNModel()
+        balanced_model.to(torch.device('cpu'))
+        balanced_model.load_state_dict(torch.load("data/ModelAudio/Models/audio_modelRNN_VF_Balanced.pt", map_location=torch.device('cpu')))
+        balanced_model.to(device)
+        _, balanced_test_score = evaluate(balanced_model, test_dataloader, criterion, metrics)
+        print(f"Test Balanced Score F1: {balanced_test_score[0]}, Accuracy: {balanced_test_score[1]}, Precision: {balanced_test_score[2]}, Recall: {balanced_test_score[3]}")
+        imbalanced_model = AudioRNNModel()
+        imbalanced_model.load_state_dict(torch.load("data/ModelAudio/Models/audio_modelRNN_VF_Imbalanced.pt", map_location=torch.device('cpu')))
+        imbalanced_model.to(device)
+        _, imbalanced_test_score = evaluate(imbalanced_model, test_dataloader, criterion, metrics)
+        print(f"Test Pocket Score F1: {imbalanced_test_score[0]}, Accuracy: {imbalanced_test_score[1]}, Precision: {imbalanced_test_score[2]}, Recall: {imbalanced_test_score[3]}")
 

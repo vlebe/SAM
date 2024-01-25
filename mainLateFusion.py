@@ -159,8 +159,8 @@ def evaluating_majority_voting(model, dataloader, metrics, embedding_model_video
                         'y_pred': outputs.cpu().numpy(),
                         'zero_division': 0.0}
             scores[i] += metric(**args_score)
-    scores = np.array(scores)
-    print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {scores / len(dataloader)}")
+    scores = np.array(scores)/len(dataloader)
+    print(f"Test Scores F1 score : {scores[0]}, accuracy_score : {scores[1]}, precision score : {scores[2]}, recall score : {scores[3]}")
 
 
 if __name__ == "__main__" :
@@ -222,8 +222,7 @@ if __name__ == "__main__" :
     subsampled_indices = subsampled_indices_0.tolist() + class_1_indices
     subdataset = torch.utils.data.Subset(dataset, subsampled_indices)
     train_dataset, validation_dataset, test_dataset = train_test_split(subdataset, test_size=0.10, val_size=0.15)
-    workers = True
-    if (device == torch.device('cuda') or device == torch.device('mps')) and workers:
+    if device == torch.device('cuda') or device == torch.device('mps'):
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers_training, pin_memory=True, collate_fn=custom_collate_Dataset)
         validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers_evaluating, pin_memory=True, collate_fn=custom_collate_Dataset)
         test_loader = DataLoader(test_dataset, shuffle=True, batch_size=args.batch_size, num_workers=args.num_workers_evaluating, pin_memory=True, collate_fn=custom_collate_Dataset)
@@ -262,22 +261,46 @@ if __name__ == "__main__" :
         plt.savefig("data/ModelLateFusion/Graphs/late_fusion_model_loss_VFVOBalanced.png")
     
     if args.majority_voting and not(args.save_model):
-        print("Evaluating majority voting")
-        evaluating_majority_voting(model, test_loader, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
+        print("Evaluating majority voting...")
+        print("... for Balanced model")
+        balanced_model_video = VideoModelLateFusion1(input_size_video, args.hidden_size_video, args.num_layers_video, args.num_classes)
+        balanced_model_audio = AudioRNNModel(input_size=args.input_size_audio_rnn, num_classes=args.num_classes)
+        balanced_model_text = TextModel2(args.input_size_text, args.num_classes)
+        balanced_model_video.load_state_dict(torch.load('data/ModelLateFusion/Models/model_video_balanced.pt', map_location=torch.device('cpu')))
+        balanced_model_audio.load_state_dict(torch.load('data/ModelLateFusion/Models/model_audio_balanced.pt', map_location=torch.device('cpu')))   
+        balanced_model_text.load_state_dict(torch.load('data/ModelLateFusion/Models/model_text_balanced.pt', map_location=torch.device('cpu')))
+        balanced_model_video.to(device)
+        balanced_model_audio.to(device)
+        balanced_model_text.to(device)
+        balanced_model = LateFusionModel2(balanced_model_video, balanced_model_audio, balanced_model_text).to(device)        
+        evaluating_majority_voting(balanced_model, test_loader, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
+        
+        print("... for Imbalanced model")
+        imbalanced_model_video = VideoModelLateFusion1(input_size_video, args.hidden_size_video, args.num_layers_video, args.num_classes)
+        imbalanced_model_audio = AudioRNNModel(input_size=args.input_size_audio_rnn, num_classes=args.num_classes)
+        imbalanced_model_text = TextModel2(args.input_size_text, args.num_classes)
+        imbalanced_model_video.load_state_dict(torch.load('data/ModelLateFusion/Models/model_video_imbalanced.pt', map_location=torch.device('cpu')))
+        imbalanced_model_audio.load_state_dict(torch.load('data/ModelLateFusion/Models/model_audio_imbalanced.pt', map_location=torch.device('cpu')))
+        imbalanced_model_text.load_state_dict(torch.load('data/ModelLateFusion/Models/model_text_imbalanced.pt', map_location=torch.device('cpu')))
+        imbalanced_model_video.to(device)
+        imbalanced_model_audio.to(device)
+        imbalanced_model_text.to(device)
+        imbalanced_model = LateFusionModel2(imbalanced_model_video, imbalanced_model_audio, imbalanced_model_text).to(device)
+        evaluating_majority_voting(imbalanced_model, test_loader, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
 
     
     if args.load_model and not(args.majority_voting):
         print("Loading model...")
-        model.to(torch.device('cpu'))
-        model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0Balanced.pt', map_location=torch.device('cpu'))).to(device)
-        _, test_scores = evaluate(model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
-        print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
-        try:
-            pocket_model = LateFusionModel(model_video, model_audio, model_text)
-            pocket_model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0BalancedEarlyStopping.pt', map_location=torch.device('cpu'))).to(device)
-            _, test_scores_pocket = evaluate(pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
-            print(f"Test Scores Pocket (F1 score, accuracy_score, precision score, recall score): {test_scores_pocket}")
-        except:
-            print("No early stopping model or wrong path")
+        balanced_model = LateFusionModel(model_video, model_audio, model_text)
+        balanced_model.to(torch.device('cpu'))
+        balanced_model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0Balanced.pt', map_location=torch.device('cpu')))
+        balanced_model.to(device)
+        _, test_scores = evaluate(balanced_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
+        print(f"Balanced Test Scores F1 score : {test_scores[0]}, accuracy_score : {test_scores[1]}, precision score : {test_scores[2]}, recall score : {test_scores[3]}")
+        imbalanced_model = LateFusionModel(model_video, model_audio, model_text)
+        imbalanced_model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0BalancedEarlyStopping.pt', map_location=torch.device('cpu')))
+        imbalanced_model.to(device)
+        _, imbalanced_test_scores = evaluate(imbalanced_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
+        print(f"Imbalanced Test Scores F1 score : {imbalanced_test_scores[0]}, accuracy_score : {imbalanced_test_scores[1]}, precision score : {imbalanced_test_scores[2]}, recall score : {imbalanced_test_scores[3]}")
 
 
