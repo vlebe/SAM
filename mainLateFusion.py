@@ -39,7 +39,7 @@ class LateFusionModel(torch.nn.Module):
 
 class LateFusionModel2(torch.nn.Module):
     def __init__(self, video_model, audio_model, text_model,num_classes=2):
-        super(LateFusionModel, self).__init__()
+        super(LateFusionModel2, self).__init__()
         self.video_model = video_model
         self.audio_model = audio_model
         self.text_model = text_model
@@ -128,6 +128,40 @@ def evaluate(model, dataloader, criterion, metrics, embedding_model_video, embed
             scores = np.array(scores)
     return total_loss / len(dataloader), scores / len(dataloader)
 
+def evaluating_majority_voting(model, dataloader, metrics, embedding_model_video, embedding_model_text, output_embedding_model_shape):
+    model.eval()
+    model.video_model.eval()
+    model.audio_model.eval()
+    model.text_model.eval()
+    embedding_model_video.eval()
+    embedding_model_text.eval()
+    global device, tokenizer
+    scores = [0 for _ in range(len(metrics))]
+    for batch in tqdm(dataloader):
+        labels, txt, mfcc, frames = batch
+        labels = labels.type(torch.LongTensor).to(device)
+        mfcc = mfcc.to(device)
+        frames = frames.to(device)
+        tokenizer_output = tokenizer(txt, return_tensors="pt", padding=True, truncation=True, max_length=512)
+        input_ids, attention_mask = tokenizer_output["input_ids"].to(device), tokenizer_output["attention_mask"].to(device)
+        sequences = torch.zeros((len(labels),4, output_embedding_model_shape[0] * output_embedding_model_shape[1] * output_embedding_model_shape[2])).to(device)
+        with torch.no_grad():
+            for j in range(frames.shape[1]):
+                sequences[:,j, :] = embedding_model_video(frames[:, j, :, :, :])
+            txt = embedding_model_text(input_ids, attention_mask)
+        outputs = model(sequences, mfcc, txt)
+        for i, metric in enumerate(metrics):
+            if metric.__name__ == "accuracy_score":
+                args_score = {'y_true': labels.cpu().numpy(), 
+                    'y_pred': outputs.cpu().numpy()}
+            else:
+                args_score = {'y_true': labels.cpu().numpy(), 
+                        'y_pred': outputs.cpu().numpy(),
+                        'zero_division': 0.0}
+            scores[i] += metric(**args_score)
+    scores = np.array(scores)
+    print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {scores / len(dataloader)}")
+
 
 if __name__ == "__main__" :
     torch.manual_seed(0)
@@ -154,9 +188,10 @@ if __name__ == "__main__" :
     parser.add_argument('--input_size_audio_mlp', type=int, default=3960, help='input size of the audio model')
     parser.add_argument('--input_size_audio_rnn', type=int, default=20, help='input size of the audio model')
     parser.add_argument('--input_size_text', type=int, default=768, help='input size of the audio model')
-    parser.add_argument('--save_model', action='store_true', default=True, help='save model or not')
+    parser.add_argument('--save_model', action='store_true', default=False, help='save model or not')
     parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
     parser.add_argument('--mlp_audio', action='store_true', default=False, help='use MLP audio model instead of RNN')
+    parser.add_argument('--majority_voting', action='store_true', default=True, help='use majority voting instead mlp')
     args = parser.parse_args()
 
 
@@ -175,7 +210,7 @@ if __name__ == "__main__" :
     model_video = model_video.to(device)
     model_audio = model_audio.to(device)
     model_text = model_text.to(device)
-    model = LateFusionModel(model_video, model_audio, model_text).to(device)
+    model = LateFusionModel2(model_video, model_audio, model_text).to(device)
     
     dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', args.resolution, args.output_embedding_model_shape, mlp_audio=args.mlp_audio)
     labels = dataset.labels["turn_after"].values
@@ -203,7 +238,7 @@ if __name__ == "__main__" :
     early_stopping = EarlyStopping(path='data/ModelLateFusion/Models/ModelLateVFV0BalancedEarlyStopping.pt')
 
 
-    if args.save_model:
+    if args.save_model and not(args.majority_voting):
         train_losses = []
         valid_losses = []
         for epoch in range(args.num_epochs):
@@ -225,6 +260,11 @@ if __name__ == "__main__" :
         plt.plot(valid_losses, label="Validation Loss")
         plt.legend()
         plt.savefig("data/ModelLateFusion/Graphs/late_fusion_model_loss_VFVOBalanced.png")
+    
+    if args.majority_voting and not(args.save_model):
+        print("Evaluating majority voting")
+        evaluating_majority_voting(model, test_loader, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
+
     
     if args.load_model:
         model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0Balanced.pt'))
