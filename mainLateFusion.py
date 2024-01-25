@@ -189,7 +189,7 @@ if __name__ == "__main__" :
     parser.add_argument('--input_size_audio_rnn', type=int, default=20, help='input size of the audio model')
     parser.add_argument('--input_size_text', type=int, default=768, help='input size of the audio model')
     parser.add_argument('--save_model', action='store_true', default=False, help='save model or not')
-    parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
+    parser.add_argument('--load_model', action='store_true', default=True, help='load model or not')
     parser.add_argument('--mlp_audio', action='store_true', default=False, help='use MLP audio model instead of RNN')
     parser.add_argument('--majority_voting', action='store_true', default=True, help='use majority voting instead mlp')
     args = parser.parse_args()
@@ -266,13 +266,18 @@ if __name__ == "__main__" :
         evaluating_majority_voting(model, test_loader, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
 
     
-    if args.load_model:
-        model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0Balanced.pt'))
-        pocket_model = LateFusionModel(model_video, model_audio, model_text).to(device)
-        pocket_model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0BalancedEarlyStopping.pt'))
+    if args.load_model and not(args.majority_voting):
+        print("Loading model...")
+        model.to(torch.device('cpu'))
+        model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0Balanced.pt', map_location=torch.device('cpu'))).to(device)
         _, test_scores = evaluate(model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
-        _, test_scores_pocket = evaluate(pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
         print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
-        print(f"Test Scores Pocket (F1 score, accuracy_score, precision score, recall score): {test_scores_pocket}")
+        try:
+            pocket_model = LateFusionModel(model_video, model_audio, model_text)
+            pocket_model.load_state_dict(torch.load('data/ModelLateFusion/Models/ModelLateVFV0BalancedEarlyStopping.pt', map_location=torch.device('cpu'))).to(device)
+            _, test_scores_pocket = evaluate(pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], embedding_model_video, embedding_model_text, args.output_embedding_model_shape)
+            print(f"Test Scores Pocket (F1 score, accuracy_score, precision score, recall score): {test_scores_pocket}")
+        except:
+            print("No early stopping model or wrong path")
 
 

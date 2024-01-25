@@ -131,8 +131,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, default=6, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
     parser.add_argument('--input_size_audio', type=int, default=3960, help='input size of the audio model')
     parser.add_argument('--input_size_text', type=int, default=768, help='input size of the audio model')
-    parser.add_argument('--save_model', action='store_true', default=True, help='save model or not')
-    parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
+    parser.add_argument('--save_model', action='store_true', default=False, help='save model or not')
+    parser.add_argument('--load_model', action='store_true', default=True, help='load model or not')
     parser.add_argument('--mlp_audio', action='store_true', default=True, help='use MLP audio model instead of RNN')
     args = parser.parse_args()
     input_size_video = args.output_embedding_model_shape[0] * args.output_embedding_model_shape[1] * args.output_embedding_model_shape[2]
@@ -198,14 +198,20 @@ if __name__ == '__main__':
         print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
     
     if args.load_model:
-        model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
-        pocket_model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
-        model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/ModelEarlyVFV0Imbalanced.pt'))
-        pocket_model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/ModelEarlyVFV0ImbalancedEarlyStopping.pt'))
+        print("Loading model...")
+        model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes)
+        model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/model_EarlyFusion_Balanced.pt', map_location=torch.device('cpu')))
+        model.to(device)
         _, test_scores = evaluate(embedding_model_video,embedding_model_text, model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
         print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
-        _, pocket_test_scores = evaluate(embedding_model_video,embedding_model_text, pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
-        print(f"Pocket Test Scores (F1 score, accuracy_score, precision score, recall score): {pocket_test_scores}")
+        try :
+            pocket_model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes)
+            pocket_model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/model_EarlyFusion_Imblanced.pt', map_location=torch.device('cpu')))
+            pocket_model.to(device)
+            _, pocket_test_scores = evaluate(embedding_model_video,embedding_model_text, pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
+            print(f"Pocket Test Scores (F1 score, accuracy_score, precision score, recall score): {pocket_test_scores}")
+        except :
+            print("No early stopping model or wrong path")
 
     
 

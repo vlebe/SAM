@@ -82,8 +82,8 @@ if __name__ == "__main__":
     parser.add_argument('--output_embedding_model_shape', type=int, default=768, help='output shape of the embedding model')
     parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--num_workers', type=int, default=1, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
-    parser.add_argument('--save_model', action='store_true', default=True, help='save model or not')
-    parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
+    parser.add_argument('--save_model', action='store_true', default=False, help='save model or not')
+    parser.add_argument('--load_model', action='store_true', default=True, help='load model or not')
     args = parser.parse_args()
 
     model = TextModel2(args.output_embedding_model_shape, args.num_classes).to(device)
@@ -113,7 +113,7 @@ if __name__ == "__main__":
         validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True)
 
-    print(len(train_loader))
+
     # weights = torch.tensor([1.0, 1.0])
     weights = torch.tensor([0.1, 0.9])
     weights = weights.to(device)
@@ -146,12 +146,19 @@ if __name__ == "__main__":
         print("Test Loss = {}, Test Scores = {}".format(test_loss, test_scores))
     
     if args.load_model:
-        model.load_state_dict(torch.load("data/ModelText/Models/text_modelVFV0.pt"))
+        print("Loading model...")
+        model = model.to(torch.device('cpu'))
+        model.load_state_dict(torch.load("data/ModelText/Models/text_model_VFBalanced.pt", map_location=torch.device('cpu')))
+        model.to(device)
         test_loss, test_scores = evaluate(embedding_model, model, test_loader, criterion, metrics, device)
         print("Test Loss = {}, Test Scores = {}".format(test_loss, test_scores))
-        pocket_model = TextModel2(args.output_embedding_model_shape, args.num_classes).to(device)
-        pocket_model.load_state_dict(torch.load("data/ModelText/Models/text_model_EarlyVFV0.pt"))
-        pocket_test_loss, pocket_test_scores = evaluate(embedding_model, pocket_model, test_loader, criterion, metrics, device) 
-        print("Pocket Test Loss = {}, Pocket Test Scores = {}".format(pocket_test_loss, pocket_test_scores))
+        try :
+            pocket_model = TextModel2(args.output_embedding_model_shape, args.num_classes)
+            pocket_model.load_state_dict(torch.load("data/ModelText/Models/text_model_VFImbalanced.pt", map_location=torch.device('cpu')))
+            pocket_model.to(device) 
+            pocket_test_loss, pocket_test_scores = evaluate(embedding_model, pocket_model, test_loader, criterion, metrics, device) 
+            print("Pocket Test Loss = {}, Pocket Test Scores = {}".format(pocket_test_loss, pocket_test_scores))
+        except:
+            print("No early stopping model or wrong path")
         
 

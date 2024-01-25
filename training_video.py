@@ -197,11 +197,17 @@ if __name__ == '__main__':
 
     if args.load_model:
         print("Loading model...")
-        model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV1Balance.pt'))
-        pocket_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes).to(device)
-        pocket_model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV1EarlyStoppingBalance.pt'))
+        model.to(torch.device('cpu'))
+        model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV1Balance.pt', map_location=torch.device('cpu')))
+        model.to(device)
         test(embedding_model, model, test_loader, criterion, args.output_embedding_model_shape)
-        test(embedding_model, pocket_model, test_loader, criterion, args.output_embedding_model_shape)
+        try: 
+            pocket_model = VideoModelLateFusion1(input_size, args.hidden_size, args.num_layers, args.num_classes)
+            pocket_model.load_state_dict(torch.load('data/ModelVideo/Models/model1VFV1EarlyStoppingBalance.pt', map_location=torch.device('cpu')))
+            pocket_model.to(device)
+            test(embedding_model, pocket_model, test_loader, criterion, args.output_embedding_model_shape)
+        except:
+            print("No early stopping model or wrong path")
 
 
 

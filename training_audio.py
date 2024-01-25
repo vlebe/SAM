@@ -104,12 +104,13 @@ if __name__ == "__main__":
     parser.add_argument('--output_embedding_model_shape', type=tuple, default=(2048, 1, 1), help='output shape of the embedding model')
     parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--num_workers', type=int, default=2, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing.')
-    parser.add_argument('--save_model', action='store_true', default=True, help='save model or not')
-    parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
+    parser.add_argument('--save_model', action='store_true', default=False, help='save model or not')
+    parser.add_argument('--load_model', action='store_true', default=True, help='load model or not')
+    parser.add_argument('--mlp_audio', action='store_true', default=False, help='use MLP audio model instead of RNN')
     args = parser.parse_args()
     
 
-    dataset = AudioDataset('labels.csv', 'data/audio/samples/', mlp_audio=False)
+    dataset = AudioDataset('labels.csv', 'data/audio/samples/', mlp_audio=args.mlp_audio)
     labels = dataset.labels["turn_after"].values
     #Doing the same but by using subset and indices
     class_0_indices = [i for i in range(len(dataset)) if labels[i] == 0]
@@ -158,11 +159,18 @@ if __name__ == "__main__":
         print(f"Test Early Score: {test_score}")
 
     if args.load_model:
-        model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_RNN_VFV0.pt"))
+        print("Loading model")
+        model.to(torch.device('cpu'))
+        model.load_state_dict(torch.load("data/ModelAudio/Models/audio_modelRNN_VF_Balanced.pt", map_location=torch.device('cpu')))
+        model.to(device)
         _, test_score = evaluate(model, test_dataloader, criterion, metrics)
         print(f"Test Early Score: {test_score}")
-        pocket_model = AudioRNNModel()
-        pocket_model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_Early_RNN_VFV0.pt"))
-        _, pocket_test_score = evaluate(pocket_model, test_dataloader, criterion, metrics)
-        print(f"Test Pocket Score: {pocket_test_score}")
+        try :
+            pocket_model = AudioRNNModel()
+            pocket_model.load_state_dict(torch.load("data/ModelAudio/Models/audio_modelRNN_VF_Imbalanced.pt", map_location=torch.device('cpu')))
+            pocket_model.to(device)
+            _, pocket_test_score = evaluate(pocket_model, test_dataloader, criterion, metrics)
+            print(f"Test Pocket Score: {pocket_test_score}")
+        except:
+            print("No early stopping model or wrong path")
 
