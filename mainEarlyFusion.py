@@ -14,6 +14,7 @@ from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_sc
 from model_video import VideoEmbedding
 from model_text import DistilCamembertEmbedding
 from transformers import AutoTokenizer
+from utils import EarlyStopping
 
 
 class EarlyFusionModel(nn.Module):
@@ -114,16 +115,16 @@ def evaluate(embedding_model_video,embedding_model_text, model, dataloader, crit
 
 
 if __name__ == '__main__':
+    torch.manual_seed(0)
+    np.random.seed(0)
 
     num_cores = os.cpu_count()
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
     parser.add_argument('--num_epochs', type=int, default=10, help='number of epochs to train for')
-    parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate')
-    parser.add_argument('--learning_rate_default', type=float, default=0.0001, help='learning rate for other layers')
+    parser.add_argument('--learning_rate', type=float, default=0.00001, help='learning rate')
     parser.add_argument('--hidden_size_gru', type=int, default=512, help='hidden size')
     parser.add_argument('--num_layers_gru', type=int, default=1, help='number of layers')
-    parser.add_argument('--max_iter', type=int, default=10, help='maximum number of iteration, witout any improvement on the train loss with tol equal to 1e-3')
     parser.add_argument('--output_embedding_model_shape', type=tuple, default=(2048, 1, 1), help='output shape of the embedding model')
     parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--resolution', type=tuple, default=(3, 224, 224), help='resolution of the input images')
@@ -132,7 +133,6 @@ if __name__ == '__main__':
     parser.add_argument('--input_size_text', type=int, default=768, help='input size of the audio model')
     parser.add_argument('--save_model', action='store_true', default=True, help='save model or not')
     parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
-    parser.add_argument('--save_model_path', type=str, default='data/ModelEarlyFusion/Models', help='path to save model')
     parser.add_argument('--mlp_audio', action='store_true', default=True, help='use MLP audio model instead of RNN')
     args = parser.parse_args()
     input_size_video = args.output_embedding_model_shape[0] * args.output_embedding_model_shape[1] * args.output_embedding_model_shape[2]
@@ -144,14 +144,6 @@ if __name__ == '__main__':
     else:
         device = torch.device('cpu')
 
-    model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
-    embedding_model_video = VideoEmbedding().to(device)
-    embedding_model_text = DistilCamembertEmbedding().to(device)
-    tokenizer = AutoTokenizer.from_pretrained("cmarkea/distilcamembert-base", use_fast=False)
-    weights = torch.tensor([0.2, 0.8]).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
-    criterion = nn.CrossEntropyLoss(weight=weights).to(device)
-
     dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', args.resolution, args.output_embedding_model_shape, mlp_audio=args.mlp_audio)
     labels = dataset.labels["turn_after"].values
     #Doing the same but by using subset and indices
@@ -162,61 +154,54 @@ if __name__ == '__main__':
     subsampled_indices = subsampled_indices_0.tolist() + class_1_indices
     subdataset = torch.utils.data.Subset(dataset, subsampled_indices)
     train_dataset, validation_dataset, test_dataset = train_test_split(subdataset, test_size=0.10, val_size=0.15)
-    workers = True
-    if (device == torch.device('cuda') or device == torch.device('mps')) and workers:
+
+    if device == torch.device('cuda') or device == torch.device('mps'):
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, collate_fn=custom_collate_Dataset)
-        validation_loader = DataLoader(validation_dataset, shuffle=True, num_workers=args.num_workers, pin_memory=True, collate_fn=custom_collate_Dataset)
-        test_loader = DataLoader(test_dataset, shuffle=True, num_workers=args.num_workers, pin_memory=True, collate_fn=custom_collate_Dataset)
+        validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, collate_fn=custom_collate_Dataset)
+        test_loader = DataLoader(test_dataset,  batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, collate_fn=custom_collate_Dataset)
     else:
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_Dataset)
-        validation_loader = DataLoader(validation_dataset, shuffle=True, collate_fn=custom_collate_Dataset)
-        test_loader = DataLoader(test_dataset, shuffle=True, collate_fn=custom_collate_Dataset)
+        validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_Dataset)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_Dataset)
+
+    model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
+    embedding_model_video = VideoEmbedding().to(device)
+    embedding_model_text = DistilCamembertEmbedding().to(device)
+    tokenizer = AutoTokenizer.from_pretrained("cmarkea/distilcamembert-base", use_fast=False)
+    weights = torch.tensor([0.2, 0.8]).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    criterion = nn.CrossEntropyLoss(weight=weights).to(device)
+    early_stopping = EarlyStopping(path='data/ModelLateFusion/Models/ModelEarlyVFV0ImbalancedEarlyStopping.pt')
 
     if args.save_model : 
         print("Start training...")
         valid_losses = []
         train_losses = []
-        non_valid_iteration = 0
-        max_iter = 20
-        models_parameters = []
         for epoch in range(args.num_epochs):
             train_loss = train(embedding_model_video,embedding_model_text, model, train_loader, optimizer, criterion, args.output_embedding_model_shape)
             valid_loss, valid_scores = evaluate(embedding_model_video,embedding_model_text, model, validation_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
-            if epoch == 0:
-                valid_losses.append(valid_loss)
-            elif valid_loss < min(valid_losses):
-                non_valid_iteration = 0
-                models_parameters.append(model.state_dict())
-            else:
-                non_valid_iteration += 1
-            if non_valid_iteration == max_iter:
-                print(f"Early stopping at epoch {epoch+1}")
+            early_stopping(valid_losses, model)
+            valid_losses.append(valid_losses)
+            train_losses.append(train_loss)
+            print("Epoch {} : Train Loss = {}, Val Loss = {}, Val Scores = {}".format(epoch, train_loss, valid_loss, valid_scores))
+
+            if early_stopping.early_stop:
+                print("Early stopping")
                 break
-            else:
-                print(f"Epoch {epoch} - Training Loss: {train_loss} - Validation Loss: {valid_loss} - Validation Scores (F1 score, accuracy_score, precision score, recall score): {valid_scores}")
-                valid_losses.append(valid_loss)
-                train_losses.append(train_loss)
-        
-        if len(models_parameters) != 0:
-            pocket_model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
-            pocket_model.load_state_dict(models_parameters[-1])
-            torch.save(pocket_model.state_dict(), 'data/ModelEarlyFusion/Models/EarlyStoppingPocketAlgoV0.pt')
-            _, pocket_test_scores = evaluate(embedding_model_video,embedding_model_text, pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
-            print(f"Pocket Test Scores (F1 score, accuracy_score, precision score, recall score): {pocket_test_scores}")
         
         plt.plot(train_losses, label="Training Loss")
         plt.plot(valid_losses, label="Validation Loss")
         plt.legend()
-        plt.savefig("data/ModelEarlyFusion/Graphs/earlyFusionModelLossV0.png")
-        torch.save(model.state_dict(), 'data/ModelEarlyFusion/Models/modelEarlyStoppingV0.pt')
+        plt.savefig("data/ModelEarlyFusion/Graphs/ModelEarlyVFV0Imbalanced.png")
+        torch.save(model.state_dict(), 'data/ModelLateFusion/Models/ModelEarlyVFV0Imbalanced.pt')
         _, test_scores = evaluate(embedding_model_video,embedding_model_text, model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
         print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
     
     if args.load_model:
         model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
         pocket_model = EarlyFusionModel(input_size_video, args.input_size_audio, args.input_size_text, args.hidden_size_gru, args.num_layers_gru, args.num_classes).to(device)
-        model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/modelVdebogEarlyStopping.pt'))
-        pocket_model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/modelVdebogEarlyStoppingPocketAlgo.pt'))
+        model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/ModelEarlyVFV0Imbalanced.pt'))
+        pocket_model.load_state_dict(torch.load('data/ModelEarlyFusion/Models/ModelEarlyVFV0ImbalancedEarlyStopping.pt'))
         _, test_scores = evaluate(embedding_model_video,embedding_model_text, model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)
         print(f"Test Scores (F1 score, accuracy_score, precision score, recall score): {test_scores}")
         _, pocket_test_scores = evaluate(embedding_model_video,embedding_model_text, pocket_model, test_loader, criterion, [f1_score, accuracy_score, precision_score, recall_score], args.output_embedding_model_shape)

@@ -8,6 +8,7 @@ from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_sc
 import numpy as np 
 import argparse
 import os
+from utils import EarlyStopping
 
 class EnsembleModel1(torch.nn.Module):
     def __init__(self, models):
@@ -85,6 +86,8 @@ def evaluate(model, dataloader, criterion, metrics):
     return total_loss / len(dataloader), scores / len(dataloader)
 
 if __name__ == "__main__":
+    torch.manual_seed(0)
+    np.random.seed(0)
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -98,13 +101,11 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
     parser.add_argument('--num_epochs', type=int, default=100, help='number of epochs to train for')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate')
-    parser.add_argument('--max_iter', type=int, default=10, help='maximum number of iteration, witout any improvement on the train loss with tol equal to 1e-3')
     parser.add_argument('--output_embedding_model_shape', type=tuple, default=(2048, 1, 1), help='output shape of the embedding model')
     parser.add_argument('--num_classes', type=int, default=2 , help='number of classes')
     parser.add_argument('--num_workers', type=int, default=2, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing.')
     parser.add_argument('--save_model', action='store_true', default=True, help='save model or not')
     parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
-    parser.add_argument('--save_model_path', type=str, default='data/ModelAudio/Models/', help='path to save model')
     args = parser.parse_args()
     
 
@@ -130,53 +131,38 @@ if __name__ == "__main__":
     criterion = torch.nn.CrossEntropyLoss(weight=weight.to(device=device))
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     metrics = [f1_score, accuracy_score, precision_score, recall_score]
+    early_stopping = EarlyStopping(path="data/ModelAudio/Models/audio_model_Early_RNN_VFV0.pt")
 
     if args.save_model:
         training_loss = []
         validation_loss = []
-        models_parameters = []
-        non_valid_iteration = 0
+
         for epoch in range(args.num_epochs):
             train_loss = train(model, train_dataloader, criterion, optimizer)
             val_loss, val_scores = evaluate(model, val_dataloader, criterion, metrics)
-            if epoch == 0:
-                min_loss = val_loss
-            else:
-                min_loss = min(validation_loss)
-            if val_loss < min_loss:
-                models_parameters.append(model.state_dict())
-                non_valid_iteration = 0
-            else:
-                non_valid_iteration += 1
-            if non_valid_iteration == args.max_iter:
-                print(f"Early stopping at epoch {epoch+1} : train loss {train_loss} valid loss {val_loss}")
-                break
-            else:
-                print(f"Epoch {epoch} - Training Loss: {train_loss} - Validation Loss: {val_loss} - Validation Scores (F1 score, accuracy_score, precision score, recall score): {val_scores}")
-            training_loss.append(train_loss)
+            early_stopping(val_loss, model)
             validation_loss.append(val_loss)
+            training_loss.append(train_loss)
+            print("Epoch {} : Train Loss = {}, Val Loss = {}, Val Scores = {}".format(epoch, train_loss, val_loss, val_scores))
 
-        if len(models_parameters) != 0:
-            pocket_model = AudioRNNModel()
-            pocket_model.load_state_dict(models_parameters[-1])
-            torch.save(pocket_model.state_dict(), "data/ModelAudio/Models/audio_model_Early_pocket_RNN_V1.pt")
-            _, pocket_test_score = evaluate(pocket_model, test_dataloader, criterion, metrics)
-            print(f"Test Pocket Score: {pocket_test_score}")
+            if early_stopping.early_stop:
+                print("Early stopping")
+                break
         
         plt.plot(training_loss, label="Training Loss")
         plt.plot(validation_loss, label="Validation Loss")
         plt.legend()
-        plt.savefig("data/ModelAudio/Graphs/audio_model_loss_RNN_V1.png")
-        torch.save(model.state_dict(), "data/ModelAudio/Models/audio_model_Early_RNN_V1.pt")
+        plt.savefig("data/ModelAudio/Graphs/audio_model_RNN_VFV0.png")
+        torch.save(model.state_dict(), "data/ModelAudio/Models/audio_model_RNN_VFV0.pt")
         _, test_score = evaluate(model, test_dataloader, criterion, metrics)
         print(f"Test Early Score: {test_score}")
 
     if args.load_model:
-        model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_Early_RNN_V1.pt"))
+        model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_RNN_VFV0.pt"))
         _, test_score = evaluate(model, test_dataloader, criterion, metrics)
         print(f"Test Early Score: {test_score}")
         pocket_model = AudioRNNModel()
-        pocket_model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_Early_pocket_RNN_V1.pt"))
+        pocket_model.load_state_dict(torch.load("data/ModelAudio/Models/audio_model_Early_RNN_VFV0.pt"))
         _, pocket_test_score = evaluate(pocket_model, test_dataloader, criterion, metrics)
         print(f"Test Pocket Score: {pocket_test_score}")
 

@@ -1,11 +1,6 @@
-from speach import elan
 import pandas as pd
 import torch
 
-def read_eaf(file_path:str) :
-    eaf = elan.read_eaf(file_path)
-    dial = pd.DataFrame(eaf.to_csv_rows(), columns=['tier', '?', 'start ','stop ','duration ','text '])
-    return dial
 
 class EarlyStopping:
     def __init__(self, patience=10, delta=0.0001, path='best_score.pt'):

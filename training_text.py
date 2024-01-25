@@ -64,6 +64,8 @@ def evaluate(embedding_model, model, dataloader, criterion, metrics, device):
     return total_text_loss / len(dataloader), scores / len(dataloader)
 
 if __name__ == "__main__":
+    torch.manual_seed(0)
+    np.random.seed(0)
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -82,7 +84,6 @@ if __name__ == "__main__":
     parser.add_argument('--num_workers', type=int, default=1, help='number of workers, corresponding to number of CPU cores that want to be used for training and testing. 6 is recommended if available.')
     parser.add_argument('--save_model', action='store_true', default=True, help='save model or not')
     parser.add_argument('--load_model', action='store_true', default=False, help='load model or not')
-    parser.add_argument('--save_model_path', type=str, default='data/ModelText/Models/', help='path to save model')
     args = parser.parse_args()
 
     model = TextModel2(args.output_embedding_model_shape, args.num_classes).to(device)
@@ -119,13 +120,11 @@ if __name__ == "__main__":
     criterion = torch.nn.CrossEntropyLoss(weight=weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     metrics = [accuracy_score, f1_score, precision_score, recall_score]
-    early_stopping = EarlyStopping()
+    early_stopping = EarlyStopping(path="data/ModelText/Models/text_model_EarlyVFV0.pt")
 
     if args.save_model:
-        models_parameters = []
         train_losses = []
         val_losses = []
-        iter_non_valid = 0
         for epoch in range(args.num_epochs):
             train_loss = train(embedding_model, model, train_loader, criterion, optimizer, device)
             val_loss, val_scores = evaluate(embedding_model, model, validation_loader, criterion, metrics, device)
@@ -141,23 +140,17 @@ if __name__ == "__main__":
         plt.plot(train_losses, label="Training Loss")
         plt.plot(val_losses, label="Validation Loss")
         plt.legend()
-        plt.savefig("data/ModelText/Graphs/text_model_lossVtest.png")
-        torch.save(model.state_dict(), "data/ModelText/Models/text_model_EarlyVtest.pt")
+        plt.savefig("data/ModelText/Graphs/text_model_VFV0.png")
+        torch.save(model.state_dict(), "data/ModelText/Models/text_model_VFV0.pt")
         test_loss, test_scores = evaluate(embedding_model, model, test_loader, criterion, metrics, device)
         print("Test Loss = {}, Test Scores = {}".format(test_loss, test_scores))
-        if len(models_parameters) > 0:
-            pocket_model = TextModel2(args.output_embedding_model_shape, args.num_classes).to(device)
-            pocket_model.load_state_dict(models_parameters[-1])
-            torch.save(models_parameters[-1], "data/ModelText/Models/text_model_Early_Pocket_AlgoVtest.pt")
-            pocket_test_loss, pocket_test_scores = evaluate(embedding_model, pocket_model, test_loader, criterion, metrics, device) 
-            print("Pocket Test Loss = {}, Pocket Test Scores = {}".format(pocket_test_loss, pocket_test_scores))
     
     if args.load_model:
-        model.load_state_dict(torch.load("data/ModelText/Models/text_model_Early.pt"))
+        model.load_state_dict(torch.load("data/ModelText/Models/text_modelVFV0.pt"))
         test_loss, test_scores = evaluate(embedding_model, model, test_loader, criterion, metrics, device)
         print("Test Loss = {}, Test Scores = {}".format(test_loss, test_scores))
         pocket_model = TextModel2(args.output_embedding_model_shape, args.num_classes).to(device)
-        pocket_model.load_state_dict(torch.load("data/ModelText/Models/text_model_Early_Pocket_Algo.pt"))
+        pocket_model.load_state_dict(torch.load("data/ModelText/Models/text_model_EarlyVFV0.pt"))
         pocket_test_loss, pocket_test_scores = evaluate(embedding_model, pocket_model, test_loader, criterion, metrics, device) 
         print("Pocket Test Loss = {}, Pocket Test Scores = {}".format(pocket_test_loss, pocket_test_scores))
         

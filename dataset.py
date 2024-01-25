@@ -184,31 +184,6 @@ class TextDataset(Dataset):
         label = self.labels["turn_after"][index]
         txt = self.txt_data[index]
         return int(label), txt
-    
-
-
-
-class ImbalancedDatasetSampler(torch.utils.data.sampler.Sampler):
-    def __init__(self, dataset, class_counts, indices=None, num_samples=None):
-        self.dataset = dataset
-        self.indices = list(range(len(dataset))) if indices is None else indices
-        self.num_samples = len(self.indices) if num_samples is None else num_samples
-
-        # Use precomputed class counts
-        self.class_counts = class_counts
-
-        # Compute the weight for each sample
-        weights = [1.0 / self.class_counts[self._get_label(idx)] for idx in self.indices]
-        self.weights = torch.DoubleTensor(weights)
-
-    def __iter__(self):
-        return iter(torch.multinomial(self.weights, self.num_samples, replacement=True).tolist())
-
-    def __len__(self):
-        return self.num_samples
-
-    def _get_label(self, index):
-        return self.dataset[index][0]  # Assuming label is the second element in each sample
 
 
     
@@ -221,118 +196,50 @@ if __name__ == "__main__" :
     else:
         device = torch.device('cpu')
 
-    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution, (2048, 1, 1))
-    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_Dataset, num_workers=10, pin_memory=True)
-    # for batch in tqdm(dataloader):
-    #     # labels, txt, mfcc, frame_sequence = batch
-    #     pass
-    # Calculate the number of label 0 and 1
-    # class_sample_count = dataset.labels["turn_after"].value_counts().values
-    # total_samples = len(dataset)
-    # print(class_sample_count)
-    # print(total_samples)
-    # labels = dataset.labels["turn_after"].values
 
-    # # Separate indices for each class
-    # class_0_indices = [i for i in range(len(dataset)) if labels[i] == 0]
-    # class_1_indices = [i for i in range(len(dataset)) if labels[i] == 1]
-    # print(len(class_0_indices))
-    # print(len(class_1_indices))
-    # # Precompute class counts
-    # class_counts = {}
-    # for idx in range(len(dataset)):
-    #     label = dataset[idx][1]
-    #     class_counts[label] = class_counts.get(label, 0) + 1
+    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution, (2048, 1, 1), mlp_audio=False)
+    labels = dataset.labels["turn_after"].values
 
-    # # Subsample the dominant class (class 0) to have the same number of samples as class 1
-    # num_samples = min(len(class_0_indices), len(class_1_indices))
-    # subsampled_indices = class_0_indices[:num_samples] + class_1_indices
-
-    # # Create a custom sampler
-    # sampler = ImbalancedDatasetSampler(dataset, class_counts, indices=subsampled_indices)
-
-    # Create a DataLoader using the custom sampler
+    #Printing the number of samples per class
     class_sample_count = dataset.labels["turn_after"].value_counts().values
-    labels = dataset.labels["turn_after"].values
-    print(labels)
-    weight = 1. / class_sample_count
-    print(weight)
-    samples_weight = np.array([weight[int(t)] for t in labels])
+    total_samples = len(dataset)
+    print(class_sample_count)
+    print(total_samples)
 
-    samples_weight = torch.from_numpy(samples_weight)
-    sampler = WeightedRandomSampler(samples_weight, len(samples_weight), replacement=True)
-    dataloader = DataLoader(dataset, batch_size=32, collate_fn=custom_collate_Dataset, num_workers=10, pin_memory=True, sampler = sampler)
-    labels_1 = 0
-    labels_0 = 0
-    old_sample = 0
-    txt_list = []
-    for batch in tqdm(dataloader):
-        labels, txt, mfcc, frame_sequence = batch
-        labels_1 += torch.sum(labels == 1)
-        labels_0 += torch.sum(labels == 0)
-        txt_list.append(txt)
-    
-    # count the occurence of each element of txt_list
-    txt_list = [item for sublist in txt_list for item in sublist]
-    dic = {}
-    for item in txt_list:
-        if item in dic:
-            dic[item] += 1
-        else:
-            dic[item] = 1
-    print(dic)
-        
-
-    print(labels_1)
-    print(labels_0)
-
-
-
-
-    dataset = Dataset('labels.csv', 'data/video/dataset_frame/', 'data/audio/samples/', 'txt_data.csv', resolution, (2048, 1, 1))
-    labels = dataset.labels["turn_after"].values
     #Doing the same but by using subset and indices
     class_0_indices = [i for i in range(len(dataset)) if labels[i] == 0]
     class_1_indices = [i for i in range(len(dataset)) if labels[i] == 1]
     #subsampling randomly class 0 to have the same number of samples as class 1
     subsampled_indices_0 = np.random.choice(class_0_indices, len(class_1_indices), replace=False)
-    print(len(subsampled_indices_0))
     subsampled_indices = subsampled_indices_0.tolist() + class_1_indices
-    print(len(subsampled_indices))
-    train_dataset = torch.utils.data.Subset(dataset, subsampled_indices)
-    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_Dataset, num_workers=10, pin_memory=True)
-    labels_1 = 0
-    labels_0 = 0
-    for batch in tqdm(train_dataloader):
-        labels, txt, mfcc, frame_sequence = batch
-        labels_1 += torch.sum(labels == 1)
-        labels_0 += torch.sum(labels == 0)
-    print(labels_1)
-    print(labels_0)
 
-
-
-
-
+    subdataset = torch.utils.data.Subset(dataset, subsampled_indices)
+    dataloader = DataLoader(subdataset, batch_size=32, shuffle=True, pin_memory=True, collate_fn=custom_collate_Dataset)
+    for batch in tqdm(dataloader):
+        labels, txt, mfcc_list, frame_sequence = batch
+        pass
     
-    # dataset = AudioDataset('labels.csv', 'data/audio/samples/', mlp_audio=False)
-    # model_audio = AudioRNNModel().to(device)
-    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate_AudioDataset)
-    # for batch in tqdm(dataloader):
-    #     labels, mfcc = batch
-    #     exemplar = mfcc.to(device)
-    #     outputs = model_audio(exemplar)
+    dataset = AudioDataset('labels.csv', 'data/audio/samples/', mlp_audio=False)
+    model_audio = AudioRNNModel().to(device)
+    subdataset = torch.utils.data.Subset(dataset, subsampled_indices)
+    dataloader = DataLoader(subdataset, batch_size=32, shuffle=True, pin_memory=True, collate_fn=custom_collate_Dataset)
+    for batch in tqdm(dataloader):
+        labels, mfcc = batch
+        exemplar = mfcc.to(device)
+        outputs = model_audio(exemplar)
 
-    # dataset = VideoDataset('labels.csv', 'data/video/dataset_frame/', resolution, (2048, 1, 1))
-    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-    # for batch in dataloader:
-    #     labels, frame_sequence = batch
-    #     print(frame_sequence.size())
-    #     exemplar = frame_sequence[:, 0, :, :, :].to(device)
-    #     print(exemplar.size())
+    dataset = VideoDataset('labels.csv', 'data/video/dataset_frame/', resolution, (2048, 1, 1))
+    subdataset = torch.utils.data.Subset(dataset, subsampled_indices)
+    dataloader = DataLoader(subdataset, batch_size=32, shuffle=True, pin_memory=True, collate_fn=custom_collate_Dataset)
+    for batch in dataloader:
+        labels, frame_sequence = batch
+        print(frame_sequence.size())
+        exemplar = frame_sequence[:, 0, :, :, :].to(device)
+        print(exemplar.size())
 
-    # dataset = TextDataset('labels.csv', 'txt_data.csv')
-    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-    # for batch in dataloader:
-    #     labels, txt = batch
-    #     print(len(txt))
+    dataset = TextDataset('labels.csv', 'txt_data.csv')
+    subdataset = torch.utils.data.Subset(dataset, subsampled_indices)
+    dataloader = DataLoader(subdataset, batch_size=32, shuffle=True, pin_memory=True, collate_fn=custom_collate_Dataset)
+    for batch in dataloader:
+        labels, txt = batch
+        print(len(txt))
