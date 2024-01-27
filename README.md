@@ -31,3 +31,21 @@ Lien utiles :
 ### Fichiers python
 - `load_data.py` : Créé le fichier data.csv (shape : (13861, 12)) qui traite les différents fichiers dans le dossier *transcr* du dataset et applique nos choix
 - `split_data.py` : Génère tous les exemples d'apprentissagesà partir du fichier data.csv des audios et des vidéos. Chaque fichier audio/vidéo et découpé par IPU. 
+- ``utils.py`` : Contient les fonctions utiles pour le projet
+- ``dataset.py`` : Contient les classes de Dataset construit à partir des fichiers générés par `split_data.py`. On peut y trouver toutes les fonctions de préprocessing des données.
+- ``model_{modalité}.py`` : Contient les classes de modèles utilisés pour le projet pour chaque modalité. On y trouve aussi les modèles d'encoder en plongements utils pour notre tâche.
+- ``train_{modalité}.py`` : Contient les fonctions d'entrainement et d'évaluation des modèles pour chaque modalité. Permet d'entrainer les modèles et de les sauvegarder.
+- ``mainLateFusion.py`` : Contient le classes, les fonctions d'entrainement et d'évaluation des modèles de late Fusion. Permet d'entrainer les modèles et de les sauvegarder.
+- ``mainEarlyFusion.py`` : Contient le classes, les fonctions d'entrainement et d'évaluation des modèles de early Fusion. Permet d'entrainer les modèles et de les sauvegarder.
+
+
+### Procédure de préparation des données
+
+- Télécharger le dataset et le décompresser dans le dossier *data*. Dans ce dossier, il faut créer un dossier *transcr* et y mettre les fichiers *transcr* du dataset. Idem pour les videos dans le dossier *videos*. Enfin, il faut créer un dossier *audios* et y mettre les audios du dataset. Nous décidons de travailler sur les 1_channels, qu'il faut convertir en *.wav*.
+- Lancer le script `load_data.py` pour créer le fichier data.csv
+- Lancer le script `split_data.py` pour créer les fichiers audios et vidéos découpés par IPU
+- Lancer le script `mainLateFusion.py` pour entrainer et évaluer les modèles de late fusion
+- Lancer le script `mainEarlyFusion.py` pour entrainer et évaluer les modèles de early fusion
+
+Nous transmettons dans notre dossier data, les samples déjà découpés par IPU pour chque modalité. Il contient aussi les modèles pré-entrainés.
+Les fichiers d'entrainement sont par défaut dans un mode d'évaluation des modèles pré-entrainés.
