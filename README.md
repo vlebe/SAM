@@ -29,7 +29,7 @@ Lien utiles :
 - Définitions et illustrations IPUs : https://www.researchgate.net/figure/Illustration-of-turn-taking-events-IPU-Interpausal-Unit-Turn-for-speaker-A-and_fig1_359613784
 
 ### Fichiers python
-- `load_data.py` : Créé le fichier data.csv (shape : (13861, 12)) qui traite les différents fichiers dans le dossier *transcr* du dataset et applique nos choix
+- `load_data.py` : Créé le fichier data.csv (shape : (9670, 12)) qui traite les différents fichiers dans le dossier *transcr* du dataset et applique nos choix
 - `split_data.py` : Génère tous les exemples d'apprentissagesà partir du fichier data.csv des audios et des vidéos. Chaque fichier audio/vidéo et découpé par IPU. 
 - ``utils.py`` : Contient les fonctions utiles pour le projet
 - ``dataset.py`` : Contient les classes de Dataset construit à partir des fichiers générés par `split_data.py`. On peut y trouver toutes les fonctions de préprocessing des données.
