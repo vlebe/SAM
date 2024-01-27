@@ -47,5 +47,4 @@ Lien utiles :
 - Lancer le script `mainLateFusion.py` pour entrainer et évaluer les modèles de late fusion
 - Lancer le script `mainEarlyFusion.py` pour entrainer et évaluer les modèles de early fusion
 
-Nous transmettons dans notre dossier data, les samples déjà découpés par IPU pour chque modalité. Il contient aussi les modèles pré-entrainés.
 Les fichiers d'entrainement sont par défaut dans un mode d'évaluation des modèles pré-entrainés.
