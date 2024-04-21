@@ -1,33 +1,56 @@
 # SAM
 
-### Objectifs du projet : Multimodal approaches to predict turn-taking in natural conversations
+# SAM 2023 Project
 
-- Manipuler différentes modalités et combiner les informations que chaque modalité apporte
-- Explorer différents types d’architectures et fusions (early / late / quels features ?)
+This project focuses on evaluating the performance of various multimodal fusion approaches for predicting turn-taking in dialogue.
 
-### Dataset PACO-CHEESE
+## Introduction
 
-- Multi modal corpus (audio + vidéo) en français
-- 26 dyades de 15-20min
-- Annotations : Segmentation de la parole basée sur les silences (IPUs) / Transcription manuelle alignée sur l’audio
-- Lien pour télécharger le dataset : [Dataset](https://amubox.univ-amu.fr/s/gkfA7rZCWGQFqif)
+In this project, we aim to evaluate the performance of different multimodal fusion approaches in the context of predicting turn-taking in dialogue. The main objective is to explore and compare the results obtained by various methods, with a particular emphasis on integrating multiple modalities into the prediction process.
 
-Annotations :
-- Colonnes :
-    - turn_at_start (bool) : Début d'un IPU
-    - turn_after (bool) : Changement de locuteur principal
-    - yield at end (bool) : Fin d'un IPU 
-    - request at start(bool) : Début d'un IPU lorsqu'une volonté de prendre la parole a été interpétée 
-    - turn_start_word(float) : Pas utile, à supprimer
+## Data Processing
 
-Choix : 
-- Les bandes son suivantes ont été supprimées car nous n'avons pas les vidéos correspondantes : JLLJ et JRBG
-- Pour AAOR nous n'avons que la bande son pour AA ou le mix des deux, nous avons choisi de l'ignorer pour le moment
+Our dataset consists of videos with corresponding audios, along with a CSV file containing information for each training example. Each example represents an Inter-Personal Unit (IPU) and includes information such as the speaker, start and end times, text, and an indication of whether there is a turn-taking after the IPU.
 
-Lien utiles :
+We performed data preprocessing by segmenting audio and video files for each IPU. Additionally, we extracted four frames from each video IPU and filtered audio clips shorter than 0.5 ms. This preprocessing resulted in approximately 10,000 examples, which we further downsampled to balance the dataset to 4,000 examples.
 
-- Définitions et illustrations IPUs : https://www.researchgate.net/figure/Illustration-of-turn-taking-events-IPU-Interpausal-Unit-Turn-for-speaker-A-and_fig1_359613784
+## Late Fusion
 
-### Fichiers python
-- `load_data.py` : Créé le fichier data.csv (shape : (13861, 12)) qui traite les différents fichiers dans le dossier *transcr* du dataset et applique nos choix
-- `split_data.py` : Génère tous les exemples d'apprentissagesà partir du fichier data.csv des audios et des vidéos. Chaque fichier audio/vidéo et découpé par IPU. 
+We began by studying the performance of a late fusion model for our task. The objective was to build an architecture with a classifier for each modality and then combine the results to improve the final prediction quality.
+
+### Audio Model
+
+We initially employed MFCC (Mel-Frequency Cepstral Coefficients) to represent audio features and experimented with various architectures, including RNNs and MLPs. We observed that the models learned to predict only 0s due to the imbalanced dataset, leading us to introduce class weights in the loss function. We tested different hyperparameters and architectures but found limited improvement.
+
+### Video Model
+
+For video classification, we utilized a pre-trained ResNet to extract features from each frame and then applied a GRU to capture temporal dynamics. Despite various adjustments, including changing the depth of MLPs, the results were not satisfactory, especially with imbalanced loss.
+
+### Text Model
+
+We employed DistilCamemBERT, a lightweight version of CamemBERT, to generate text embeddings. We added an MLP layer on top of the [CLS] token output for classification. Results were similar to audio and video models, with challenges in handling imbalanced data.
+
+### Fusion and Results
+
+We combined predictions from the audio, video, and text models using two methods: linear combination with learnable weights and majority voting. While the late fusion model demonstrated better accuracy and precision in most cases, the voting ensemble approach showed promising results, especially with balanced loss.
+
+## Early Fusion
+
+We explored another fusion method, early fusion, aiming to integrate features from different modalities before classification to create a unified representation.
+
+### Feature Representation
+
+We extracted features for each modality, including audio MFCCs, video ResNet embeddings, and text DistilCamemBERT embeddings.
+
+### Fusion
+
+We combined these features by averaging them and passing them through an MLP for classification.
+
+### Results
+
+Early fusion results were mixed, with challenges in outperforming unimodal models. Further exploration and refinement of the early fusion architecture are needed to improve performance.
+
+## Conclusion
+
+In conclusion, this project allowed us to evaluate various modalities for predicting turn-taking in dialogue. While each model could be improved, fusion of modalities showed potential in enhancing system performance, particularly in the late fusion approach. Further analysis and optimization of fusion methods are essential for advancing multimodal dialogue prediction systems.
+
